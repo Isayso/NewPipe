@@ -18,8 +18,8 @@
 
 <b>WARNING: PUTTING NEWPIPE OR ANY FORK OF IT INTO GOOGLE PLAYSTORE VIOLATES THEIR TERMS OF CONDITIONS.</b>
 
-## Screenshots
-
+## fork differences
+* under folder apk you find the release apk without debug overhead stuff
 
 ## Description
 
@@ -33,8 +33,6 @@ NewPipe does not use any Google framework libraries, nor the YouTube API. Websit
 * Listen to YouTube videos
 * Popup mode (floating player)
 * Select streaming player to watch video with
-* Download videos
-* Download audio only
 * Open a video in Kodi
 * Show next/related videos
 * Search YouTube in a specific language
