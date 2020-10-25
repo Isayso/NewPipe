@@ -19,7 +19,7 @@
 <b>WARNING: PUTTING NEWPIPE OR ANY FORK OF IT INTO GOOGLE PLAYSTORE VIOLATES THEIR TERMS OF CONDITIONS.</b>
 
 ## fork differences
-* under folder apk you find the release apk without debug overhead stuff
+* under folder app/apk you find the release apk without debug overhead stuff
 
 ## Description
 
