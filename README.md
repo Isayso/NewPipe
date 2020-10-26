@@ -53,12 +53,6 @@ NewPipe does not use any Google framework libraries, nor the YouTube API. Websit
 * Multi-service support (e.g. SoundCloud \[beta\])
 * Livestream support
 
-### Coming Features
-
-* Cast to UPnP and Cast
-* Show comments
-* … and many more
-
 ## Contribution
 Whether you have ideas, translations, design changes, code cleaning, or real heavy code changes, help is always welcome.
 The more is done the better it gets!
