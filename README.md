@@ -19,7 +19,7 @@
 <b>WARNING: PUTTING NEWPIPE OR ANY FORK OF IT INTO GOOGLE PLAYSTORE VIOLATES THEIR TERMS OF CONDITIONS.</b>
 
 ## fork differences
-* under folder app/apk you find the release apk without debug overhead stuff
+* release from the old version 19 UI with bugfixes
 
 ## Description
 
@@ -99,3 +99,6 @@ will. Specifically you can redistribute and/or modify it under the terms of the
 [GNU General Public License](https://www.gnu.org/licenses/gpl.html) as
 published by the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.  
+
+![GitHub Releases (by Release)](https://img.shields.io/github/downloads/Isayso/NewPipe/v0.19.9/total)
+
