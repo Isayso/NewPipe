@@ -1,33 +1,35 @@
 package org.schabi.newpipe;
 
+import android.annotation.TargetApi;
 import android.app.Application;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Build;
-import android.preference.PreferenceManager;
-import android.support.annotation.Nullable;
 import android.util.Log;
+
+import androidx.annotation.NonNull;
+import androidx.preference.PreferenceManager;
 
 import com.nostra13.universalimageloader.cache.memory.impl.LRULimitedMemoryCache;
 import com.nostra13.universalimageloader.core.ImageLoader;
 import com.nostra13.universalimageloader.core.ImageLoaderConfiguration;
-import com.squareup.leakcanary.LeakCanary;
-import com.squareup.leakcanary.RefWatcher;
 
 import org.acra.ACRA;
-import org.acra.config.ACRAConfiguration;
 import org.acra.config.ACRAConfigurationException;
-import org.acra.config.ConfigurationBuilder;
+import org.acra.config.CoreConfiguration;
+import org.acra.config.CoreConfigurationBuilder;
 import org.acra.sender.ReportSenderFactory;
-import org.schabi.newpipe.extractor.Downloader;
 import org.schabi.newpipe.extractor.NewPipe;
-import org.schabi.newpipe.extractor.utils.Localization;
+import org.schabi.newpipe.extractor.downloader.Downloader;
 import org.schabi.newpipe.report.AcraReportSenderFactory;
 import org.schabi.newpipe.report.ErrorActivity;
 import org.schabi.newpipe.report.UserAction;
 import org.schabi.newpipe.settings.SettingsActivity;
-import org.schabi.newpipe.util.ExtractorHelper;
+import org.schabi.newpipe.util.ExceptionUtils;
+import org.schabi.newpipe.util.Localization;
+import org.schabi.newpipe.util.ServiceHelper;
 import org.schabi.newpipe.util.StateSaver;
 
 import java.io.IOException;
@@ -36,7 +38,6 @@ import java.net.SocketException;
 import java.util.Collections;
 import java.util.List;
 
-import io.reactivex.annotations.NonNull;
 import io.reactivex.exceptions.CompositeException;
 import io.reactivex.exceptions.MissingBackpressureException;
 import io.reactivex.exceptions.OnErrorNotImplementedException;
@@ -64,14 +65,17 @@ import io.reactivex.plugins.RxJavaPlugins;
 
 public class App extends Application {
     protected static final String TAG = App.class.toString();
-    private RefWatcher refWatcher;
-
     @SuppressWarnings("unchecked")
     private static final Class<? extends ReportSenderFactory>[]
-            reportSenderFactoryClasses = new Class[]{AcraReportSenderFactory.class};
+            REPORT_SENDER_FACTORY_CLASSES = new Class[]{AcraReportSenderFactory.class};
+    private static App app;
+
+    public static App getApp() {
+        return app;
+    }
 
     @Override
-    protected void attachBaseContext(Context base) {
+    protected void attachBaseContext(final Context base) {
         super.attachBaseContext(base);
 
         initACRA();
@@ -81,53 +85,72 @@ public class App extends Application {
     public void onCreate() {
         super.onCreate();
 
-        if (LeakCanary.isInAnalyzerProcess(this)) {
-            // This process is dedicated to LeakCanary for heap analysis.
-            // You should not init your app in this process.
-            return;
-        }
-        refWatcher = installLeakCanary();
+        app = this;
 
         // Initialize settings first because others inits can use its values
         SettingsActivity.initSettings(this);
 
         NewPipe.init(getDownloader(),
-                org.schabi.newpipe.util.Localization.getPreferredExtractorLocal(this));
+                Localization.getPreferredLocalization(this),
+                Localization.getPreferredContentCountry(this));
+        Localization.init(getApplicationContext());
+
         StateSaver.init(this);
         initNotificationChannel();
+
+        ServiceHelper.initServices(this);
 
         // Initialize image loader
         ImageLoader.getInstance().init(getImageLoaderConfigurations(10, 50));
 
         configureRxJavaErrorHandler();
+
+        // Check for new version
+        new CheckForNewAppVersionTask().execute();
     }
 
     protected Downloader getDownloader() {
-        return org.schabi.newpipe.Downloader.init(null);
+        DownloaderImpl downloader = DownloaderImpl.init(null);
+        setCookiesToDownloader(downloader);
+        return downloader;
+    }
+
+    protected void setCookiesToDownloader(final DownloaderImpl downloader) {
+        final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(
+                getApplicationContext());
+        final String key = getApplicationContext().getString(R.string.recaptcha_cookies_key);
+        downloader.setCookie(ReCaptchaActivity.RECAPTCHA_COOKIES_KEY, prefs.getString(key, ""));
+        downloader.updateYoutubeRestrictedModeCookies(getApplicationContext());
     }
 
     private void configureRxJavaErrorHandler() {
         // https://github.com/ReactiveX/RxJava/wiki/What's-different-in-2.0#error-handling
         RxJavaPlugins.setErrorHandler(new Consumer<Throwable>() {
             @Override
-            public void accept(@NonNull Throwable throwable) {
-                Log.e(TAG, "RxJavaPlugins.ErrorHandler called with -> : " +
-                        "throwable = [" + throwable.getClass().getName() + "]");
+            public void accept(@NonNull final Throwable throwable) {
+                Log.e(TAG, "RxJavaPlugins.ErrorHandler called with -> : "
+                        + "throwable = [" + throwable.getClass().getName() + "]");
 
+                final Throwable actualThrowable;
                 if (throwable instanceof UndeliverableException) {
-                    // As UndeliverableException is a wrapper, get the cause of it to get the "real" exception
-                    throwable = throwable.getCause();
+                    // As UndeliverableException is a wrapper,
+                    // get the cause of it to get the "real" exception
+                    actualThrowable = throwable.getCause();
+                } else {
+                    actualThrowable = throwable;
                 }
 
                 final List<Throwable> errors;
-                if (throwable instanceof CompositeException) {
-                    errors = ((CompositeException) throwable).getExceptions();
+                if (actualThrowable instanceof CompositeException) {
+                    errors = ((CompositeException) actualThrowable).getExceptions();
                 } else {
-                    errors = Collections.singletonList(throwable);
+                    errors = Collections.singletonList(actualThrowable);
                 }
 
                 for (final Throwable error : errors) {
-                    if (isThrowableIgnored(error)) return;
+                    if (isThrowableIgnored(error)) {
+                        return;
+                    }
                     if (isThrowableCritical(error)) {
                         reportException(error);
                         return;
@@ -137,22 +160,24 @@ public class App extends Application {
                 // Out-of-lifecycle exceptions should only be reported if a debug user wishes so,
                 // When exception is not reported, log it
                 if (isDisposedRxExceptionsReported()) {
-                    reportException(throwable);
+                    reportException(actualThrowable);
                 } else {
-                    Log.e(TAG, "RxJavaPlugin: Undeliverable Exception received: ", throwable);
+                    Log.e(TAG, "RxJavaPlugin: Undeliverable Exception received: ", actualThrowable);
                 }
             }
 
             private boolean isThrowableIgnored(@NonNull final Throwable throwable) {
                 // Don't crash the application over a simple network problem
-                return ExtractorHelper.hasAssignableCauseThrowable(throwable,
-                        IOException.class, SocketException.class, // network api cancellation
-                        InterruptedException.class, InterruptedIOException.class); // blocking code disposed
+                return ExceptionUtils.hasAssignableCause(throwable,
+                        // network api cancellation
+                        IOException.class, SocketException.class,
+                        // blocking code disposed
+                        InterruptedException.class, InterruptedIOException.class);
             }
 
             private boolean isThrowableCritical(@NonNull final Throwable throwable) {
                 // Though these exceptions cannot be ignored
-                return ExtractorHelper.hasAssignableCauseThrowable(throwable,
+                return ExceptionUtils.hasAssignableCause(throwable,
                         NullPointerException.class, IllegalArgumentException.class, // bug in app
                         OnErrorNotImplementedException.class, MissingBackpressureException.class,
                         IllegalStateException.class); // bug in operator
@@ -177,8 +202,8 @@ public class App extends Application {
 
     private void initACRA() {
         try {
-            final ACRAConfiguration acraConfig = new ConfigurationBuilder(this)
-                    .setReportSenderFactoryClasses(reportSenderFactoryClasses)
+            final CoreConfiguration acraConfig = new CoreConfigurationBuilder(this)
+                    .setReportSenderFactoryClasses(REPORT_SENDER_FACTORY_CLASSES)
                     .setBuildConfigClass(BuildConfig.class)
                     .build();
             ACRA.init(this, acraConfig);
@@ -189,7 +214,7 @@ public class App extends Application {
                     null,
                     null,
                     ErrorActivity.ErrorInfo.make(UserAction.SOMETHING_ELSE, "none",
-                    "Could not initialize ACRA crash report", R.string.app_ui_crash));
+                            "Could not initialize ACRA crash report", R.string.app_ui_crash));
         }
     }
 
@@ -211,16 +236,31 @@ public class App extends Application {
         NotificationManager mNotificationManager =
                 (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         mNotificationManager.createNotificationChannel(mChannel);
+
+        setUpUpdateNotificationChannel(importance);
     }
 
-    @Nullable
-    public static RefWatcher getRefWatcher(Context context) {
-        final App application = (App) context.getApplicationContext();
-        return application.refWatcher;
-    }
+    /**
+     * Set up notification channel for app update.
+     *
+     * @param importance
+     */
+    @TargetApi(Build.VERSION_CODES.O)
+    private void setUpUpdateNotificationChannel(final int importance) {
+        final String appUpdateId
+                = getString(R.string.app_update_notification_channel_id);
+        final CharSequence appUpdateName
+                = getString(R.string.app_update_notification_channel_name);
+        final String appUpdateDescription
+                = getString(R.string.app_update_notification_channel_description);
 
-    protected RefWatcher installLeakCanary() {
-        return RefWatcher.DISABLED;
+        NotificationChannel appUpdateChannel
+                = new NotificationChannel(appUpdateId, appUpdateName, importance);
+        appUpdateChannel.setDescription(appUpdateDescription);
+
+        NotificationManager appUpdateNotificationManager
+                = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        appUpdateNotificationManager.createNotificationChannel(appUpdateChannel);
     }
 
     protected boolean isDisposedRxExceptionsReported() {

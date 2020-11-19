@@ -2,30 +2,19 @@ package org.schabi.newpipe.fragments.detail;
 
 import android.app.Activity;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
-import android.support.annotation.DrawableRes;
-import android.support.annotation.FloatRange;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.v4.content.ContextCompat;
-import android.support.v4.view.animation.FastOutSlowInInterpolator;
-import android.support.v7.app.ActionBar;
-import android.support.v7.app.AlertDialog;
-import android.support.v7.app.AppCompatActivity;
 import android.text.Html;
 import android.text.Spanned;
 import android.text.TextUtils;
-import android.text.method.LinkMovementMethod;
 import android.text.util.Linkify;
 import android.util.DisplayMetrics;
 import android.util.Log;
-import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -33,19 +22,27 @@ import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewParent;
 import android.widget.AdapterView;
 import android.widget.FrameLayout;
-import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
-import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.nirhart.parallaxscroll.views.ParallaxScrollView;
+import androidx.annotation.DrawableRes;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.content.res.AppCompatResources;
+import androidx.core.content.ContextCompat;
+import androidx.fragment.app.Fragment;
+import androidx.viewpager.widget.ViewPager;
+
+import com.google.android.material.appbar.AppBarLayout;
+import com.google.android.material.tabs.TabLayout;
 import com.nostra13.universalimageloader.core.assist.FailReason;
 import com.nostra13.universalimageloader.core.listener.ImageLoadingListener;
 import com.nostra13.universalimageloader.core.listener.SimpleImageLoadingListener;
@@ -55,85 +52,93 @@ import org.schabi.newpipe.ReCaptchaActivity;
 import org.schabi.newpipe.download.DownloadDialog;
 import org.schabi.newpipe.extractor.InfoItem;
 import org.schabi.newpipe.extractor.NewPipe;
-import org.schabi.newpipe.extractor.exceptions.ContentNotAvailableException;
-import org.schabi.newpipe.extractor.exceptions.ParsingException;
+import org.schabi.newpipe.extractor.ServiceList;
+import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor;
 import org.schabi.newpipe.extractor.stream.AudioStream;
+import org.schabi.newpipe.extractor.stream.Description;
 import org.schabi.newpipe.extractor.stream.Stream;
 import org.schabi.newpipe.extractor.stream.StreamInfo;
-import org.schabi.newpipe.extractor.stream.StreamInfoItem;
 import org.schabi.newpipe.extractor.stream.StreamType;
 import org.schabi.newpipe.extractor.stream.VideoStream;
 import org.schabi.newpipe.fragments.BackPressable;
 import org.schabi.newpipe.fragments.BaseStateFragment;
-import org.schabi.newpipe.info_list.InfoItemBuilder;
-import org.schabi.newpipe.info_list.InfoItemDialog;
+import org.schabi.newpipe.fragments.EmptyFragment;
+import org.schabi.newpipe.fragments.list.comments.CommentsFragment;
+import org.schabi.newpipe.fragments.list.videos.RelatedVideosFragment;
 import org.schabi.newpipe.local.dialog.PlaylistAppendDialog;
 import org.schabi.newpipe.local.history.HistoryRecordManager;
 import org.schabi.newpipe.player.MainVideoPlayer;
 import org.schabi.newpipe.player.PopupVideoPlayer;
-import org.schabi.newpipe.player.helper.PlayerHelper;
 import org.schabi.newpipe.player.playqueue.PlayQueue;
 import org.schabi.newpipe.player.playqueue.SinglePlayQueue;
 import org.schabi.newpipe.report.ErrorActivity;
 import org.schabi.newpipe.report.UserAction;
+import org.schabi.newpipe.util.AndroidTvUtils;
 import org.schabi.newpipe.util.Constants;
 import org.schabi.newpipe.util.ExtractorHelper;
 import org.schabi.newpipe.util.ImageDisplayConstants;
 import org.schabi.newpipe.util.InfoCache;
+import org.schabi.newpipe.util.KoreUtil;
 import org.schabi.newpipe.util.ListHelper;
 import org.schabi.newpipe.util.Localization;
 import org.schabi.newpipe.util.NavigationHelper;
-import org.schabi.newpipe.util.OnClickGesture;
 import org.schabi.newpipe.util.PermissionHelper;
+import org.schabi.newpipe.util.ShareUtils;
 import org.schabi.newpipe.util.StreamItemAdapter;
 import org.schabi.newpipe.util.StreamItemAdapter.StreamSizeWrapper;
 import org.schabi.newpipe.util.ThemeHelper;
+import org.schabi.newpipe.views.AnimatedProgressBar;
+import org.schabi.newpipe.views.LargeTextMovementMethod;
 
 import java.io.Serializable;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import icepick.State;
+import io.noties.markwon.Markwon;
+import io.noties.markwon.linkify.LinkifyPlugin;
 import io.reactivex.Single;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.schedulers.Schedulers;
 
+import static org.schabi.newpipe.extractor.StreamingService.ServiceInfo.MediaCapability.COMMENTS;
+import static org.schabi.newpipe.extractor.stream.StreamExtractor.NO_AGE_LIMIT;
 import static org.schabi.newpipe.util.AnimationUtils.animateView;
 
-public class VideoDetailFragment
-        extends BaseStateFragment<StreamInfo>
-        implements BackPressable,
-        SharedPreferences.OnSharedPreferenceChangeListener,
-        View.OnClickListener,
-        View.OnLongClickListener {
+public class VideoDetailFragment extends BaseStateFragment<StreamInfo>
+        implements BackPressable, SharedPreferences.OnSharedPreferenceChangeListener,
+        View.OnClickListener, View.OnLongClickListener {
     public static final String AUTO_PLAY = "auto_play";
-
-    // Amount of videos to show on start
-    private static final int INITIAL_RELATED_VIDEOS = 8;
-
-    private InfoItemBuilder infoItemBuilder = null;
 
     private int updateFlags = 0;
     private static final int RELATED_STREAMS_UPDATE_FLAG = 0x1;
     private static final int RESOLUTIONS_MENU_UPDATE_FLAG = 0x2;
     private static final int TOOLBAR_ITEMS_UPDATE_FLAG = 0x4;
+    private static final int COMMENTS_UPDATE_FLAG = 0x8;
 
     private boolean autoPlayEnabled;
     private boolean showRelatedStreams;
-    private boolean wasRelatedStreamsExpanded = false;
+    private boolean showComments;
+    private String selectedTabTag;
 
-    @State protected int serviceId = Constants.NO_SERVICE_ID;
-    @State protected String name;
-    @State protected String url;
+    @State
+    protected int serviceId = Constants.NO_SERVICE_ID;
+    @State
+    protected String name;
+    @State
+    protected String url;
 
     private StreamInfo currentInfo;
     private Disposable currentWorker;
-    @NonNull private CompositeDisposable disposables = new CompositeDisposable();
+    @NonNull
+    private CompositeDisposable disposables = new CompositeDisposable();
+    @Nullable
+    private Disposable positionSubscriber = null;
 
     private List<VideoStream> sortedVideoStreams;
     private int selectedVideoStreamIndex = -1;
@@ -146,16 +151,15 @@ public class VideoDetailFragment
 
     private Spinner spinnerToolbar;
 
-    private ParallaxScrollView parallaxScrollRootView;
     private LinearLayout contentRootLayoutHiding;
 
     private View thumbnailBackgroundButton;
     private ImageView thumbnailImageView;
     private ImageView thumbnailPlayButton;
+    private AnimatedProgressBar positionView;
 
     private View videoTitleRoot;
     private TextView videoTitleTextView;
-    @Nullable
     private ImageView videoTitleToggleArrow;
     private TextView videoCountView;
 
@@ -165,6 +169,7 @@ public class VideoDetailFragment
     private TextView detailControlsDownload;
     private TextView appendControlsDetail;
     private TextView detailDurationView;
+    private TextView detailPositionView;
 
     private LinearLayout videoDescriptionRootLayout;
     private TextView videoUploadDateView;
@@ -173,6 +178,8 @@ public class VideoDetailFragment
     private View uploaderRootLayout;
     private TextView uploaderTextView;
     private ImageView uploaderThumb;
+    private TextView subChannelTextView;
+    private ImageView subChannelThumb;
 
     private TextView thumbsUpTextView;
     private ImageView thumbsUpImageView;
@@ -180,44 +187,74 @@ public class VideoDetailFragment
     private ImageView thumbsDownImageView;
     private TextView thumbsDisabledTextView;
 
-    private TextView nextStreamTitle;
-    private LinearLayout relatedStreamRootLayout;
-    private LinearLayout relatedStreamsView;
-    private ImageButton relatedStreamExpandButton;
-
+    private AppBarLayout appBarLayout;
+    private ViewPager viewPager;
+    private TabAdaptor pageAdapter;
+    private TabLayout tabLayout;
+    private FrameLayout relatedStreamsLayout;
 
     /*////////////////////////////////////////////////////////////////////////*/
 
-    public static VideoDetailFragment getInstance(int serviceId, String videoUrl, String name) {
+    private static final String COMMENTS_TAB_TAG = "COMMENTS";
+    private static final String RELATED_TAB_TAG = "NEXT VIDEO";
+    private static final String EMPTY_TAB_TAG = "EMPTY TAB";
+
+    private static final String INFO_KEY = "info_key";
+    private static final String STACK_KEY = "stack_key";
+
+    /**
+     * Stack that contains the "navigation history".<br>
+     * The peek is the current video.
+     */
+    private final LinkedList<StackItem> stack = new LinkedList<>();
+
+    public static VideoDetailFragment getInstance(final int serviceId, final String videoUrl,
+                                                  final String name) {
         VideoDetailFragment instance = new VideoDetailFragment();
         instance.setInitialData(serviceId, videoUrl, name);
         return instance;
     }
+
 
     /*//////////////////////////////////////////////////////////////////////////
     // Fragment's Lifecycle
     //////////////////////////////////////////////////////////////////////////*/
 
     @Override
-    public void onCreate(Bundle savedInstanceState) {
+    public void onCreate(final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setHasOptionsMenu(true);
 
         showRelatedStreams = PreferenceManager.getDefaultSharedPreferences(activity)
                 .getBoolean(getString(R.string.show_next_video_key), true);
+
+        showComments = PreferenceManager.getDefaultSharedPreferences(activity)
+                .getBoolean(getString(R.string.show_comments_key), true);
+
+        selectedTabTag = PreferenceManager.getDefaultSharedPreferences(activity)
+                .getString(getString(R.string.stream_info_selected_tab_key), COMMENTS_TAB_TAG);
+
         PreferenceManager.getDefaultSharedPreferences(activity)
                 .registerOnSharedPreferenceChangeListener(this);
     }
 
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+    public View onCreateView(@NonNull final LayoutInflater inflater, final ViewGroup container,
+                             final Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_video_detail, container, false);
     }
 
     @Override
     public void onPause() {
         super.onPause();
-        if (currentWorker != null) currentWorker.dispose();
+        if (currentWorker != null) {
+            currentWorker.dispose();
+        }
+        PreferenceManager.getDefaultSharedPreferences(getContext())
+                .edit()
+                .putString(getString(R.string.stream_info_selected_tab_key),
+                        pageAdapter.getItemTitle(viewPager.getCurrentItem()))
+                .apply();
     }
 
     @Override
@@ -226,20 +263,30 @@ public class VideoDetailFragment
 
         if (updateFlags != 0) {
             if (!isLoading.get() && currentInfo != null) {
-                if ((updateFlags & RELATED_STREAMS_UPDATE_FLAG) != 0) initRelatedVideos(currentInfo);
-                if ((updateFlags & RESOLUTIONS_MENU_UPDATE_FLAG) != 0) setupActionBar(currentInfo);
+                if ((updateFlags & RELATED_STREAMS_UPDATE_FLAG) != 0) {
+                    startLoading(false);
+                }
+                if ((updateFlags & RESOLUTIONS_MENU_UPDATE_FLAG) != 0) {
+                    setupActionBar(currentInfo);
+                }
+                if ((updateFlags & COMMENTS_UPDATE_FLAG) != 0) {
+                    startLoading(false);
+                }
             }
 
             if ((updateFlags & TOOLBAR_ITEMS_UPDATE_FLAG) != 0
                     && menu != null) {
                 updateMenuItemVisibility();
             }
+
             updateFlags = 0;
         }
 
         // Check if it was loading when the fragment was stopped/paused,
         if (wasLoading.getAndSet(false)) {
             selectAndLoadVideo(serviceId, url, name);
+        } else if (currentInfo != null) {
+            updateProgressInfo(currentInfo);
         }
     }
 
@@ -249,28 +296,41 @@ public class VideoDetailFragment
         PreferenceManager.getDefaultSharedPreferences(activity)
                 .unregisterOnSharedPreferenceChangeListener(this);
 
-        if (currentWorker != null) currentWorker.dispose();
-        if (disposables != null) disposables.clear();
+        if (positionSubscriber != null) {
+            positionSubscriber.dispose();
+        }
+        if (currentWorker != null) {
+            currentWorker.dispose();
+        }
+        if (disposables != null) {
+            disposables.clear();
+        }
+        positionSubscriber = null;
         currentWorker = null;
         disposables = null;
     }
 
     @Override
     public void onDestroyView() {
-        if (DEBUG) Log.d(TAG, "onDestroyView() called");
+        if (DEBUG) {
+            Log.d(TAG, "onDestroyView() called");
+        }
         spinnerToolbar.setOnItemSelectedListener(null);
         spinnerToolbar.setAdapter(null);
         super.onDestroyView();
     }
 
     @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+    public void onActivityResult(final int requestCode, final int resultCode, final Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         switch (requestCode) {
             case ReCaptchaActivity.RECAPTCHA_REQUEST:
                 if (resultCode == Activity.RESULT_OK) {
-                    NavigationHelper.openVideoDetailFragment(getFragmentManager(), serviceId, url, name);
-                } else Log.e(TAG, "ReCaptcha failed");
+                    NavigationHelper
+                            .openVideoDetailFragment(getFragmentManager(), serviceId, url, name);
+                } else {
+                    Log.e(TAG, "ReCaptcha failed");
+                }
                 break;
             default:
                 Log.e(TAG, "Request code from activity not supported [" + requestCode + "]");
@@ -279,7 +339,8 @@ public class VideoDetailFragment
     }
 
     @Override
-    public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
+    public void onSharedPreferenceChanged(final SharedPreferences sharedPreferences,
+                                          final String key) {
         if (key.equals(getString(R.string.show_next_video_key))) {
             showRelatedStreams = sharedPreferences.getBoolean(key, true);
             updateFlags |= RELATED_STREAMS_UPDATE_FLAG;
@@ -290,6 +351,9 @@ public class VideoDetailFragment
             updateFlags |= RESOLUTIONS_MENU_UPDATE_FLAG;
         } else if (key.equals(getString(R.string.show_play_with_kodi_key))) {
             updateFlags |= TOOLBAR_ITEMS_UPDATE_FLAG;
+        } else if (key.equals(getString(R.string.show_comments_key))) {
+            showComments = sharedPreferences.getBoolean(key, true);
+            updateFlags |= COMMENTS_UPDATE_FLAG;
         }
     }
 
@@ -297,21 +361,9 @@ public class VideoDetailFragment
     // State Saving
     //////////////////////////////////////////////////////////////////////////*/
 
-    private static final String INFO_KEY = "info_key";
-    private static final String STACK_KEY = "stack_key";
-    private static final String WAS_RELATED_EXPANDED_KEY = "was_related_expanded_key";
-
     @Override
-    public void onSaveInstanceState(Bundle outState) {
+    public void onSaveInstanceState(final Bundle outState) {
         super.onSaveInstanceState(outState);
-
-        // Check if the next video label and video is visible,
-        // if it is, include the two elements in the next check
-        int nextCount = currentInfo != null && currentInfo.getNextVideo() != null ? 2 : 0;
-        if (relatedStreamsView != null
-                && relatedStreamsView.getChildCount() > INITIAL_RELATED_VIDEOS + nextCount) {
-            outState.putSerializable(WAS_RELATED_EXPANDED_KEY, true);
-        }
 
         if (!isLoading.get() && currentInfo != null && isVisible()) {
             outState.putSerializable(INFO_KEY, currentInfo);
@@ -321,15 +373,14 @@ public class VideoDetailFragment
     }
 
     @Override
-    protected void onRestoreInstanceState(@NonNull Bundle savedState) {
+    protected void onRestoreInstanceState(@NonNull final Bundle savedState) {
         super.onRestoreInstanceState(savedState);
 
-        wasRelatedStreamsExpanded = savedState.getBoolean(WAS_RELATED_EXPANDED_KEY, false);
         Serializable serializable = savedState.getSerializable(INFO_KEY);
         if (serializable instanceof StreamInfo) {
             //noinspection unchecked
             currentInfo = (StreamInfo) serializable;
-            InfoCache.getInstance().putInfo(serviceId, url, currentInfo);
+            InfoCache.getInstance().putInfo(serviceId, url, currentInfo, InfoItem.InfoType.STREAM);
         }
 
         serializable = savedState.getSerializable(STACK_KEY);
@@ -344,8 +395,10 @@ public class VideoDetailFragment
     //////////////////////////////////////////////////////////////////////////*/
 
     @Override
-    public void onClick(View v) {
-        if (isLoading.get() || currentInfo == null) return;
+    public void onClick(final View v) {
+        if (isLoading.get() || currentInfo == null) {
+            return;
+        }
 
         switch (v.getId()) {
             case R.id.detail_controls_background:
@@ -361,23 +414,23 @@ public class VideoDetailFragment
                 }
                 break;
             case R.id.detail_controls_download:
-                if (PermissionHelper.checkStoragePermissions(activity, PermissionHelper.DOWNLOAD_DIALOG_REQUEST_CODE)) {
+                if (PermissionHelper.checkStoragePermissions(activity,
+                        PermissionHelper.DOWNLOAD_DIALOG_REQUEST_CODE)) {
                     this.openDownloadDialog();
                 }
                 break;
             case R.id.detail_uploader_root_layout:
-                if (TextUtils.isEmpty(currentInfo.getUploaderUrl())) {
-                    Log.w(TAG, "Can't open channel because we got no channel URL");
-                } else {
-                    try {
-                        NavigationHelper.openChannelFragment(
-                                getFragmentManager(),
-                                currentInfo.getServiceId(),
-                                currentInfo.getUploaderUrl(),
-                                currentInfo.getUploaderName());
-                    } catch (Exception e) {
-                        ErrorActivity.reportUiError((AppCompatActivity) getActivity(), e);
+                if (TextUtils.isEmpty(currentInfo.getSubChannelUrl())) {
+                    if (!TextUtils.isEmpty(currentInfo.getUploaderUrl())) {
+                        openChannel(currentInfo.getUploaderUrl(), currentInfo.getUploaderName());
                     }
+
+                    if (DEBUG) {
+                        Log.i(TAG, "Can't open sub-channel because we got no channel URL");
+                    }
+                } else {
+                    openChannel(currentInfo.getSubChannelUrl(),
+                            currentInfo.getSubChannelName());
                 }
                 break;
             case R.id.detail_thumbnail_root_layout:
@@ -391,15 +444,26 @@ public class VideoDetailFragment
             case R.id.detail_title_root_layout:
                 toggleTitleAndDescription();
                 break;
-            case R.id.detail_related_streams_expand:
-                toggleExpandRelatedVideos(currentInfo);
-                break;
+        }
+    }
+
+    private void openChannel(final String subChannelUrl, final String subChannelName) {
+        try {
+            NavigationHelper.openChannelFragment(
+                    getFragmentManager(),
+                    currentInfo.getServiceId(),
+                    subChannelUrl,
+                    subChannelName);
+        } catch (Exception e) {
+            ErrorActivity.reportUiError((AppCompatActivity) getActivity(), e);
         }
     }
 
     @Override
-    public boolean onLongClick(View v) {
-        if (isLoading.get() || currentInfo == null) return false;
+    public boolean onLongClick(final View v) {
+        if (isLoading.get() || currentInfo == null) {
+            return false;
+        }
 
         switch (v.getId()) {
             case R.id.detail_controls_background:
@@ -411,49 +475,37 @@ public class VideoDetailFragment
             case R.id.detail_controls_download:
                 NavigationHelper.openDownloads(getActivity());
                 break;
+            case R.id.detail_uploader_root_layout:
+                if (TextUtils.isEmpty(currentInfo.getSubChannelUrl())) {
+                    Log.w(TAG,
+                            "Can't open parent channel because we got no parent channel URL");
+                } else {
+                    openChannel(currentInfo.getUploaderUrl(), currentInfo.getUploaderName());
+                }
+                break;
+            case R.id.detail_title_root_layout:
+                ShareUtils.copyToClipboard(getContext(), videoTitleTextView.getText().toString());
+                break;
         }
 
         return true;
     }
 
     private void toggleTitleAndDescription() {
-        if (videoTitleToggleArrow != null) {    //it is null for tablets
-            if (videoDescriptionRootLayout.getVisibility() == View.VISIBLE) {
-                videoTitleTextView.setMaxLines(1);
-                videoDescriptionRootLayout.setVisibility(View.GONE);
-                videoTitleToggleArrow.setImageResource(R.drawable.arrow_down);
-            } else {
-                videoTitleTextView.setMaxLines(10);
-                videoDescriptionRootLayout.setVisibility(View.VISIBLE);
-                videoTitleToggleArrow.setImageResource(R.drawable.arrow_up);
-            }
+        if (videoDescriptionRootLayout.getVisibility() == View.VISIBLE) {
+            videoTitleTextView.setMaxLines(1);
+            videoDescriptionRootLayout.setVisibility(View.GONE);
+            videoDescriptionView.setFocusable(false);
+            videoTitleToggleArrow.setImageResource(
+                    ThemeHelper.resolveResourceIdFromAttr(requireContext(), R.attr.ic_expand_more));
+        } else {
+            videoTitleTextView.setMaxLines(10);
+            videoDescriptionRootLayout.setVisibility(View.VISIBLE);
+            videoDescriptionView.setFocusable(true);
+            videoDescriptionView.setMovementMethod(new LargeTextMovementMethod());
+            videoTitleToggleArrow.setImageResource(
+                    ThemeHelper.resolveResourceIdFromAttr(requireContext(), R.attr.ic_expand_less));
         }
-    }
-
-    private void toggleExpandRelatedVideos(StreamInfo info) {
-        if (DEBUG) Log.d(TAG, "toggleExpandRelatedVideos() called with: info = [" + info + "]");
-        if (!showRelatedStreams) return;
-
-        int nextCount = info.getNextVideo() != null ? 2 : 0;
-        int initialCount = INITIAL_RELATED_VIDEOS + nextCount;
-
-        if (relatedStreamsView.getChildCount() > initialCount) {
-            relatedStreamsView.removeViews(initialCount,
-                    relatedStreamsView.getChildCount() - (initialCount));
-            relatedStreamExpandButton.setImageDrawable(ContextCompat.getDrawable(
-                    activity, ThemeHelper.resolveResourceIdFromAttr(activity, R.attr.expand)));
-            return;
-        }
-
-        //Log.d(TAG, "toggleExpandRelatedVideos() called with: info = [" + info + "], from = [" + INITIAL_RELATED_VIDEOS + "]");
-        for (int i = INITIAL_RELATED_VIDEOS; i < info.getRelatedStreams().size(); i++) {
-            InfoItem item = info.getRelatedStreams().get(i);
-            //Log.d(TAG, "i = " + i);
-            relatedStreamsView.addView(infoItemBuilder.buildView(relatedStreamsView, item));
-        }
-        relatedStreamExpandButton.setImageDrawable(
-                ContextCompat.getDrawable(activity,
-                        ThemeHelper.resolveResourceIdFromAttr(activity, R.attr.collapse)));
     }
 
     /*//////////////////////////////////////////////////////////////////////////
@@ -461,11 +513,9 @@ public class VideoDetailFragment
     //////////////////////////////////////////////////////////////////////////*/
 
     @Override
-    protected void initViews(View rootView, Bundle savedInstanceState) {
+    protected void initViews(final View rootView, final Bundle savedInstanceState) {
         super.initViews(rootView, savedInstanceState);
         spinnerToolbar = activity.findViewById(R.id.toolbar).findViewById(R.id.toolbar_spinner);
-
-        parallaxScrollRootView = rootView.findViewById(R.id.detail_main_content);
 
         thumbnailBackgroundButton = rootView.findViewById(R.id.detail_thumbnail_root_layout);
         thumbnailImageView = rootView.findViewById(R.id.detail_thumbnail_image_view);
@@ -477,6 +527,7 @@ public class VideoDetailFragment
         videoTitleTextView = rootView.findViewById(R.id.detail_video_title_view);
         videoTitleToggleArrow = rootView.findViewById(R.id.detail_toggle_description_view);
         videoCountView = rootView.findViewById(R.id.detail_view_count_view);
+        positionView = rootView.findViewById(R.id.position_view);
 
         detailControlsBackground = rootView.findViewById(R.id.detail_controls_background);
         detailControlsPopup = rootView.findViewById(R.id.detail_controls_popup);
@@ -484,14 +535,12 @@ public class VideoDetailFragment
         detailControlsDownload = rootView.findViewById(R.id.detail_controls_download);
         appendControlsDetail = rootView.findViewById(R.id.touch_append_detail);
         detailDurationView = rootView.findViewById(R.id.detail_duration_view);
+        detailPositionView = rootView.findViewById(R.id.detail_position_view);
 
         videoDescriptionRootLayout = rootView.findViewById(R.id.detail_description_root_layout);
         videoUploadDateView = rootView.findViewById(R.id.detail_upload_date_view);
         videoDescriptionView = rootView.findViewById(R.id.detail_description_view);
-        videoDescriptionView.setMovementMethod(LinkMovementMethod.getInstance());
-        videoDescriptionView.setAutoLinkMask(Linkify.WEB_URLS);
 
-        //thumbsRootLayout = rootView.findViewById(R.id.detail_thumbs_root_layout);
         thumbsUpTextView = rootView.findViewById(R.id.detail_thumbs_up_count_view);
         thumbsUpImageView = rootView.findViewById(R.id.detail_thumbs_up_img_view);
         thumbsDownTextView = rootView.findViewById(R.id.detail_thumbs_down_count_view);
@@ -501,41 +550,47 @@ public class VideoDetailFragment
         uploaderRootLayout = rootView.findViewById(R.id.detail_uploader_root_layout);
         uploaderTextView = rootView.findViewById(R.id.detail_uploader_text_view);
         uploaderThumb = rootView.findViewById(R.id.detail_uploader_thumbnail_view);
+        subChannelTextView = rootView.findViewById(R.id.detail_sub_channel_text_view);
+        subChannelThumb = rootView.findViewById(R.id.detail_sub_channel_thumbnail_view);
 
-        relatedStreamRootLayout = rootView.findViewById(R.id.detail_related_streams_root_layout);
-        nextStreamTitle = rootView.findViewById(R.id.detail_next_stream_title);
-        relatedStreamsView = rootView.findViewById(R.id.detail_related_streams_view);
+        appBarLayout = rootView.findViewById(R.id.appbarlayout);
+        viewPager = rootView.findViewById(R.id.viewpager);
+        pageAdapter = new TabAdaptor(getChildFragmentManager());
+        viewPager.setAdapter(pageAdapter);
+        tabLayout = rootView.findViewById(R.id.tablayout);
+        tabLayout.setupWithViewPager(viewPager);
 
-        relatedStreamExpandButton = rootView.findViewById(R.id.detail_related_streams_expand);
+        relatedStreamsLayout = rootView.findViewById(R.id.relatedStreamsLayout);
 
-        infoItemBuilder = new InfoItemBuilder(activity);
         setHeightThumbnail();
+
+        thumbnailBackgroundButton.requestFocus();
+
+        if (AndroidTvUtils.isTv(getContext())) {
+            // remove ripple effects from detail controls
+            final int transparent = getResources().getColor(R.color.transparent_background_color);
+            detailControlsAddToPlaylist.setBackgroundColor(transparent);
+            detailControlsBackground.setBackgroundColor(transparent);
+            detailControlsPopup.setBackgroundColor(transparent);
+            detailControlsDownload.setBackgroundColor(transparent);
+        }
+
     }
 
     @Override
     protected void initListeners() {
         super.initListeners();
-        infoItemBuilder.setOnStreamSelectedListener(new OnClickGesture<StreamInfoItem>() {
-            @Override
-            public void selected(StreamInfoItem selectedItem) {
-                selectAndLoadVideo(selectedItem.getServiceId(), selectedItem.getUrl(), selectedItem.getName());
-            }
 
-            @Override
-            public void held(StreamInfoItem selectedItem) {
-                showStreamDialog(selectedItem);
-            }
-        });
-
-        videoTitleRoot.setOnClickListener(this);
+        videoTitleRoot.setOnLongClickListener(this);
         uploaderRootLayout.setOnClickListener(this);
+        uploaderRootLayout.setOnLongClickListener(this);
+        videoTitleRoot.setOnClickListener(this);
         thumbnailBackgroundButton.setOnClickListener(this);
         detailControlsBackground.setOnClickListener(this);
         detailControlsPopup.setOnClickListener(this);
         detailControlsAddToPlaylist.setOnClickListener(this);
         detailControlsDownload.setOnClickListener(this);
         detailControlsDownload.setOnLongClickListener(this);
-        relatedStreamExpandButton.setOnClickListener(this);
 
         detailControlsBackground.setLongClickable(true);
         detailControlsPopup.setLongClickable(true);
@@ -543,42 +598,6 @@ public class VideoDetailFragment
         detailControlsPopup.setOnLongClickListener(this);
         detailControlsBackground.setOnTouchListener(getOnControlsTouchListener());
         detailControlsPopup.setOnTouchListener(getOnControlsTouchListener());
-    }
-
-    private void showStreamDialog(final StreamInfoItem item) {
-        final Context context = getContext();
-        if (context == null || context.getResources() == null || getActivity() == null) return;
-
-        final String[] commands = new String[]{
-                context.getResources().getString(R.string.enqueue_on_background),
-                context.getResources().getString(R.string.enqueue_on_popup),
-                context.getResources().getString(R.string.append_playlist),
-                context.getResources().getString(R.string.share)
-        };
-
-        final DialogInterface.OnClickListener actions = (DialogInterface dialogInterface, int i) -> {
-            switch (i) {
-                case 0:
-                    NavigationHelper.enqueueOnBackgroundPlayer(context, new SinglePlayQueue(item));
-                    break;
-                case 1:
-                    NavigationHelper.enqueueOnPopupPlayer(getActivity(), new SinglePlayQueue(item));
-                    break;
-                case 2:
-                    if (getFragmentManager() != null) {
-                        PlaylistAppendDialog.fromStreamInfoItems(Collections.singletonList(item))
-                                .show(getFragmentManager(), TAG);
-                    }
-                    break;
-                case 3:
-                    shareUrl(item.getName(), item.getUrl());
-                    break;
-                default:
-                    break;
-            }
-        };
-
-        new InfoItemDialog(getActivity(), item, commands, actions).show();
     }
 
     private View.OnTouchListener getOnControlsTouchListener() {
@@ -596,64 +615,31 @@ public class VideoDetailFragment
         };
     }
 
-    private void initThumbnailViews(@NonNull StreamInfo info) {
+    private void initThumbnailViews(@NonNull final StreamInfo info) {
         thumbnailImageView.setImageResource(R.drawable.dummy_thumbnail_dark);
         if (!TextUtils.isEmpty(info.getThumbnailUrl())) {
             final String infoServiceName = NewPipe.getNameOfService(info.getServiceId());
             final ImageLoadingListener onFailListener = new SimpleImageLoadingListener() {
                 @Override
-                public void onLoadingFailed(String imageUri, View view, FailReason failReason) {
+                public void onLoadingFailed(final String imageUri, final View view,
+                                            final FailReason failReason) {
                     showSnackBarError(failReason.getCause(), UserAction.LOAD_IMAGE,
                             infoServiceName, imageUri, R.string.could_not_load_thumbnails);
                 }
             };
 
-            imageLoader.displayImage(info.getThumbnailUrl(), thumbnailImageView,
+            IMAGE_LOADER.displayImage(info.getThumbnailUrl(), thumbnailImageView,
                     ImageDisplayConstants.DISPLAY_THUMBNAIL_OPTIONS, onFailListener);
         }
 
-        if (!TextUtils.isEmpty(info.getUploaderAvatarUrl())) {
-            imageLoader.displayImage(info.getUploaderAvatarUrl(), uploaderThumb,
+        if (!TextUtils.isEmpty(info.getSubChannelAvatarUrl())) {
+            IMAGE_LOADER.displayImage(info.getSubChannelAvatarUrl(), subChannelThumb,
                     ImageDisplayConstants.DISPLAY_AVATAR_OPTIONS);
         }
-    }
 
-    private void initRelatedVideos(StreamInfo info) {
-        if (relatedStreamsView.getChildCount() > 0) relatedStreamsView.removeAllViews();
-
-        if (info.getNextVideo() != null && showRelatedStreams) {
-            nextStreamTitle.setVisibility(View.VISIBLE);
-            relatedStreamsView.addView(
-                    infoItemBuilder.buildView(relatedStreamsView, info.getNextVideo()));
-            relatedStreamsView.addView(getSeparatorView());
-            setRelatedStreamsVisibility(View.VISIBLE);
-        } else {
-            nextStreamTitle.setVisibility(View.GONE);
-            setRelatedStreamsVisibility(View.GONE);
-        }
-
-        if (info.getRelatedStreams() != null
-                && !info.getRelatedStreams().isEmpty() && showRelatedStreams) {
-            //long first = System.nanoTime(), each;
-            int to = info.getRelatedStreams().size() >= INITIAL_RELATED_VIDEOS
-                    ? INITIAL_RELATED_VIDEOS
-                    : info.getRelatedStreams().size();
-            for (int i = 0; i < to; i++) {
-                InfoItem item = info.getRelatedStreams().get(i);
-                //each = System.nanoTime();
-                relatedStreamsView.addView(infoItemBuilder.buildView(relatedStreamsView, item));
-                //if (DEBUG) Log.d(TAG, "each took " + ((System.nanoTime() - each) / 1000000L) + "ms");
-            }
-            //if (DEBUG) Log.d(TAG, "Total time " + ((System.nanoTime() - first) / 1000000L) + "ms");
-
-            setRelatedStreamsVisibility(View.VISIBLE);
-            relatedStreamExpandButton.setVisibility(View.VISIBLE);
-
-            relatedStreamExpandButton.setImageDrawable(ContextCompat.getDrawable(
-                    activity, ThemeHelper.resolveResourceIdFromAttr(activity, R.attr.expand)));
-        } else {
-            if (info.getNextVideo() == null) setRelatedStreamsVisibility(View.GONE);
-            relatedStreamExpandButton.setVisibility(View.GONE);
+        if (!TextUtils.isEmpty(info.getUploaderAvatarUrl())) {
+            IMAGE_LOADER.displayImage(info.getUploaderAvatarUrl(), uploaderThumb,
+                    ImageDisplayConstants.DISPLAY_AVATAR_OPTIONS);
         }
     }
 
@@ -662,13 +648,13 @@ public class VideoDetailFragment
     //////////////////////////////////////////////////////////////////////////*/
 
     @Override
-    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
-        this.menu = menu;
+    public void onCreateOptionsMenu(final Menu m, final MenuInflater inflater) {
+        this.menu = m;
 
         // CAUTION set item properties programmatically otherwise it would not be accepted by
         // appcompat itemsinflater.inflate(R.menu.videoitem_detail, menu);
 
-        inflater.inflate(R.menu.video_detail_menu, menu);
+        inflater.inflate(R.menu.video_detail_menu, m);
 
         updateMenuItemVisibility();
 
@@ -680,41 +666,46 @@ public class VideoDetailFragment
     }
 
     private void updateMenuItemVisibility() {
-
-        // show kodi if set in settings
+        // show kodi button if it supports the current service and it is enabled in settings
         menu.findItem(R.id.action_play_with_kodi).setVisible(
-                PreferenceManager.getDefaultSharedPreferences(activity).getBoolean(
+                KoreUtil.isServiceSupportedByKore(serviceId)
+                && PreferenceManager.getDefaultSharedPreferences(activity).getBoolean(
                         activity.getString(R.string.show_play_with_kodi_key), false));
     }
 
     @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        if(isLoading.get()) {
-            // if is still loading block menu
+    public boolean onOptionsItemSelected(final MenuItem item) {
+        int id = item.getItemId();
+        if (id == R.id.action_settings) {
+            NavigationHelper.openSettings(requireContext());
             return true;
         }
 
-        int id = item.getItemId();
+        if (isLoading.get()) {
+            // if still loading, block menu buttons related to video info
+            return true;
+        }
+
         switch (id) {
-            case R.id.menu_item_share: {
+            case R.id.menu_item_share:
                 if (currentInfo != null) {
-                    shareUrl(currentInfo.getName(), currentInfo.getUrl());
+                    ShareUtils.shareUrl(requireContext(), currentInfo.getName(),
+                            currentInfo.getOriginalUrl());
                 }
                 return true;
-            }
-            case R.id.menu_item_openInBrowser: {
+            case R.id.menu_item_openInBrowser:
                 if (currentInfo != null) {
-                    openUrlInBrowser(currentInfo.getUrl());
+                    ShareUtils.openUrlInBrowser(requireContext(), currentInfo.getOriginalUrl());
                 }
                 return true;
-            }
             case R.id.action_play_with_kodi:
                 try {
-                    NavigationHelper.playWithKore(activity, Uri.parse(
-                            url.replace("https", "http")));
+                    NavigationHelper.playWithKore(activity, Uri.parse(currentInfo.getUrl()));
                 } catch (Exception e) {
-                    if(DEBUG) Log.i(TAG, "Failed to start kore", e);
-                    showInstallKoreDialog(activity);
+                    if (DEBUG) {
+                        Log.i(TAG, "Failed to start kore", e);
+                    }
+                    KoreUtil.showInstallKoreDialog(activity);
                 }
                 return true;
             default:
@@ -722,40 +713,39 @@ public class VideoDetailFragment
         }
     }
 
-    private static void showInstallKoreDialog(final Context context) {
-        final AlertDialog.Builder builder = new AlertDialog.Builder(context);
-        builder.setMessage(R.string.kore_not_found)
-                .setPositiveButton(R.string.install, (DialogInterface dialog, int which) ->
-                        NavigationHelper.installKore(context))
-                .setNegativeButton(R.string.cancel, (DialogInterface dialog, int which) -> {});
-        builder.create().show();
-    }
-
-    private void setupActionBarOnError(final String url) {
-        if (DEBUG) Log.d(TAG, "setupActionBarHandlerOnError() called with: url = [" + url + "]");
+    private void setupActionBarOnError(final String u) {
+        if (DEBUG) {
+            Log.d(TAG, "setupActionBarHandlerOnError() called with: url = [" + u + "]");
+        }
         Log.e("-----", "missing code");
     }
 
     private void setupActionBar(final StreamInfo info) {
-        if (DEBUG) Log.d(TAG, "setupActionBarHandler() called with: info = [" + info + "]");
+        if (DEBUG) {
+            Log.d(TAG, "setupActionBarHandler() called with: info = [" + info + "]");
+        }
         boolean isExternalPlayerEnabled = PreferenceManager.getDefaultSharedPreferences(activity)
                 .getBoolean(activity.getString(R.string.use_external_video_player_key), false);
 
-        sortedVideoStreams = ListHelper.getSortedStreamVideosList(activity, info.getVideoStreams(), info.getVideoOnlyStreams(), false);
-        selectedVideoStreamIndex = ListHelper.getDefaultResolutionIndex(activity, sortedVideoStreams);
+        sortedVideoStreams = ListHelper.getSortedStreamVideosList(activity, info.getVideoStreams(),
+                info.getVideoOnlyStreams(), false);
+        selectedVideoStreamIndex = ListHelper
+                .getDefaultResolutionIndex(activity, sortedVideoStreams);
 
-        final StreamItemAdapter<VideoStream> streamsAdapter = new StreamItemAdapter<>(activity, new StreamSizeWrapper<>(sortedVideoStreams), isExternalPlayerEnabled);
+        final StreamItemAdapter<VideoStream, Stream> streamsAdapter = new StreamItemAdapter<>(
+                activity, new StreamSizeWrapper<>(sortedVideoStreams, activity),
+                isExternalPlayerEnabled);
         spinnerToolbar.setAdapter(streamsAdapter);
         spinnerToolbar.setSelection(selectedVideoStreamIndex);
         spinnerToolbar.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+            public void onItemSelected(final AdapterView<?> parent, final View view,
+                                       final int position, final long id) {
                 selectedVideoStreamIndex = position;
             }
 
             @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-            }
+            public void onNothingSelected(final AdapterView<?> parent) { }
         });
     }
 
@@ -763,37 +753,31 @@ public class VideoDetailFragment
     // OwnStack
     //////////////////////////////////////////////////////////////////////////*/
 
-    /**
-     * Stack that contains the "navigation history".<br>
-     * The peek is the current video.
-     */
-    protected final LinkedList<StackItem> stack = new LinkedList<>();
-
-    public void clearHistory() {
-        stack.clear();
-    }
-
-    public void pushToStack(int serviceId, String videoUrl, String name) {
+    private void pushToStack(final int sid, final String videoUrl, final String title) {
         if (DEBUG) {
-            Log.d(TAG, "pushToStack() called with: serviceId = [" + serviceId + "], videoUrl = [" + videoUrl + "], name = [" + name + "]");
+            Log.d(TAG, "pushToStack() called with: serviceId = ["
+                    + sid + "], videoUrl = [" + videoUrl + "], title = [" + title + "]");
         }
 
-        if (stack.size() > 0 && stack.peek().getServiceId() == serviceId && stack.peek().getUrl().equals(videoUrl)) {
-            Log.d(TAG, "pushToStack() called with: serviceId == peek.serviceId = [" + serviceId + "], videoUrl == peek.getUrl = [" + videoUrl + "]");
+        if (stack.size() > 0
+                && stack.peek().getServiceId() == sid
+                && stack.peek().getUrl().equals(videoUrl)) {
+            Log.d(TAG, "pushToStack() called with: serviceId == peek.serviceId = ["
+                    + sid + "], videoUrl == peek.getUrl = [" + videoUrl + "]");
             return;
         } else {
             Log.d(TAG, "pushToStack() wasn't equal");
         }
 
-        stack.push(new StackItem(serviceId, videoUrl, name));
+        stack.push(new StackItem(sid, videoUrl, title));
     }
 
-    public void setTitleToUrl(int serviceId, String videoUrl, String name) {
-        if (name != null && !name.isEmpty()) {
+    private void setTitleToUrl(final int sid, final String videoUrl, final String title) {
+        if (title != null && !title.isEmpty()) {
             for (StackItem stackItem : stack) {
-                if (stack.peek().getServiceId() == serviceId
+                if (stack.peek().getServiceId() == sid
                         && stackItem.getUrl().equals(videoUrl)) {
-                    stackItem.setTitle(name);
+                    stackItem.setTitle(title);
                 }
             }
         }
@@ -801,16 +785,21 @@ public class VideoDetailFragment
 
     @Override
     public boolean onBackPressed() {
-        if (DEBUG) Log.d(TAG, "onBackPressed() called");
+        if (DEBUG) {
+            Log.d(TAG, "onBackPressed() called");
+        }
         // That means that we are on the start of the stack,
         // return false to let the MainActivity handle the onBack
-        if (stack.size() <= 1) return false;
+        if (stack.size() <= 1) {
+            return false;
+        }
         // Remove top
         stack.pop();
         // Get stack item from the new top
         StackItem peek = stack.peek();
 
-        selectAndLoadVideo(peek.getServiceId(), peek.getUrl(), !TextUtils.isEmpty(peek.getTitle()) ? peek.getTitle() : "");
+        selectAndLoadVideo(peek.getServiceId(), peek.getUrl(),
+                !TextUtils.isEmpty(peek.getTitle()) ? peek.getTitle() : "");
         return true;
     }
 
@@ -820,61 +809,116 @@ public class VideoDetailFragment
 
     @Override
     protected void doInitialLoadLogic() {
-        if (currentInfo == null) prepareAndLoadInfo();
-        else prepareAndHandleInfo(currentInfo, false);
+        if (currentInfo == null) {
+            prepareAndLoadInfo();
+        } else {
+            prepareAndHandleInfo(currentInfo, false);
+        }
     }
 
-    public void selectAndLoadVideo(int serviceId, String videoUrl, String name) {
-        setInitialData(serviceId, videoUrl, name);
+    public void selectAndLoadVideo(final int sid, final String videoUrl, final String title) {
+        setInitialData(sid, videoUrl, title);
         prepareAndLoadInfo();
     }
 
-    public void prepareAndHandleInfo(final StreamInfo info, boolean scrollToTop) {
-        if (DEBUG) Log.d(TAG, "prepareAndHandleInfo() called with: info = [" + info + "], scrollToTop = [" + scrollToTop + "]");
+    private void prepareAndHandleInfo(final StreamInfo info, final boolean scrollToTop) {
+        if (DEBUG) {
+            Log.d(TAG, "prepareAndHandleInfo() called with: "
+                    + "info = [" + info + "], scrollToTop = [" + scrollToTop + "]");
+        }
 
-        setInitialData(info.getServiceId(), info.getOriginalUrl(), info.getName());
+        setInitialData(info.getServiceId(), info.getUrl(), info.getName());
         pushToStack(serviceId, url, name);
         showLoading();
+        initTabs();
 
-        Log.d(TAG, "prepareAndHandleInfo() called parallaxScrollRootView.getScrollY(): "
-                + parallaxScrollRootView.getScrollY());
-        final boolean greaterThanThreshold = parallaxScrollRootView.getScrollY() > (int)
-                (getResources().getDisplayMetrics().heightPixels * .1f);
+        if (scrollToTop) {
+            appBarLayout.setExpanded(true, true);
+        }
+        handleResult(info);
+        showContent();
 
-        if (scrollToTop) parallaxScrollRootView.smoothScrollTo(0, 0);
-        animateView(contentRootLayoutHiding,
-                false,
-                greaterThanThreshold ? 250 : 0, 0, () -> {
-                    handleResult(info);
-                    showContentWithAnimation(120, 0, .01f);
-                });
     }
 
-    protected void prepareAndLoadInfo() {
-        parallaxScrollRootView.smoothScrollTo(0, 0);
+    private void prepareAndLoadInfo() {
+        appBarLayout.setExpanded(true, true);
         pushToStack(serviceId, url, name);
         startLoading(false);
     }
 
     @Override
-    public void startLoading(boolean forceLoad) {
+    public void startLoading(final boolean forceLoad) {
         super.startLoading(forceLoad);
 
+        initTabs();
         currentInfo = null;
-        if (currentWorker != null) currentWorker.dispose();
+        if (currentWorker != null) {
+            currentWorker.dispose();
+        }
+
+        final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(activity);
 
         currentWorker = ExtractorHelper.getStreamInfo(serviceId, url, forceLoad)
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
-                .subscribe((@NonNull StreamInfo result) -> {
+                .subscribe((@NonNull final StreamInfo result) -> {
                     isLoading.set(false);
-                    currentInfo = result;
-                    showContentWithAnimation(120, 0, 0);
-                    handleResult(result);
-                }, (@NonNull Throwable throwable) -> {
+                    if (result.getAgeLimit() != NO_AGE_LIMIT && !prefs.getBoolean(
+                            getString(R.string.show_age_restricted_content), false)) {
+                        hideAgeRestrictedContent();
+                    } else {
+                        currentInfo = result;
+                        handleResult(result);
+                        showContent();
+                    }
+                }, (@NonNull final Throwable throwable) -> {
                     isLoading.set(false);
                     onError(throwable);
                 });
+    }
+
+    private void initTabs() {
+        if (pageAdapter.getCount() != 0) {
+            selectedTabTag = pageAdapter.getItemTitle(viewPager.getCurrentItem());
+        }
+        pageAdapter.clearAllItems();
+
+        if (shouldShowComments()) {
+            pageAdapter.addFragment(CommentsFragment.getInstance(serviceId, url, name),
+                    COMMENTS_TAB_TAG);
+        }
+
+        if (showRelatedStreams && null == relatedStreamsLayout) {
+            //temp empty fragment. will be updated in handleResult
+            pageAdapter.addFragment(new Fragment(), RELATED_TAB_TAG);
+        }
+
+        if (pageAdapter.getCount() == 0) {
+            pageAdapter.addFragment(new EmptyFragment(), EMPTY_TAB_TAG);
+        }
+
+        pageAdapter.notifyDataSetUpdate();
+
+        if (pageAdapter.getCount() < 2) {
+            tabLayout.setVisibility(View.GONE);
+        } else {
+            int position = pageAdapter.getItemPositionByTitle(selectedTabTag);
+            if (position != -1) {
+                viewPager.setCurrentItem(position);
+            }
+            tabLayout.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private boolean shouldShowComments() {
+        try {
+            return showComments && NewPipe.getService(serviceId)
+                    .getServiceInfo()
+                    .getMediaCapabilities()
+                    .contains(COMMENTS);
+        } catch (ExtractionException e) {
+            return false;
+        }
     }
 
     /*//////////////////////////////////////////////////////////////////////////
@@ -903,12 +947,11 @@ public class VideoDetailFragment
 
         final PlayQueue itemQueue = new SinglePlayQueue(currentInfo);
         if (append) {
-            NavigationHelper.enqueueOnPopupPlayer(activity, itemQueue);
+            NavigationHelper.enqueueOnPopupPlayer(activity, itemQueue, false);
         } else {
             Toast.makeText(activity, R.string.popup_playing_toast, Toast.LENGTH_SHORT).show();
-            final Intent intent = NavigationHelper.getPlayerIntent(
-                    activity, PopupVideoPlayer.class, itemQueue, getSelectedVideoStream().resolution
-            );
+            final Intent intent = NavigationHelper.getPlayerIntent(activity,
+                    PopupVideoPlayer.class, itemQueue, getSelectedVideoStream().resolution, true);
             activity.startService(intent);
         }
     }
@@ -927,9 +970,9 @@ public class VideoDetailFragment
     private void openNormalBackgroundPlayer(final boolean append) {
         final PlayQueue itemQueue = new SinglePlayQueue(currentInfo);
         if (append) {
-            NavigationHelper.enqueueOnBackgroundPlayer(activity, itemQueue);
+            NavigationHelper.enqueueOnBackgroundPlayer(activity, itemQueue, false);
         } else {
-            NavigationHelper.playOnBackgroundPlayer(activity, itemQueue);
+            NavigationHelper.playOnBackgroundPlayer(activity, itemQueue, true);
         }
     }
 
@@ -939,7 +982,7 @@ public class VideoDetailFragment
         mIntent = NavigationHelper.getPlayerIntent(activity,
                 MainVideoPlayer.class,
                 playQueue,
-                getSelectedVideoStream().getResolution());
+                getSelectedVideoStream().getResolution(), true);
         startActivity(mIntent);
     }
 
@@ -947,7 +990,7 @@ public class VideoDetailFragment
     // Utils
     //////////////////////////////////////////////////////////////////////////*/
 
-    public void setAutoplay(boolean autoplay) {
+    public void setAutoplay(final boolean autoplay) {
         this.autoPlayEnabled = autoplay;
     }
 
@@ -955,12 +998,12 @@ public class VideoDetailFragment
                                        @NonNull final StreamInfo info,
                                        @NonNull final Stream selectedStream) {
         NavigationHelper.playOnExternalPlayer(context, currentInfo.getName(),
-                currentInfo.getUploaderName(), selectedStream);
+                currentInfo.getSubChannelName(), selectedStream);
 
         final HistoryRecordManager recordManager = new HistoryRecordManager(requireContext());
         disposables.add(recordManager.onViewed(info).onErrorComplete()
                 .subscribe(
-                        ignored -> {/* successful */},
+                        ignored -> { /* successful */ },
                         error -> Log.e(TAG, "Register view failure: ", error)
                 ));
     }
@@ -970,46 +1013,42 @@ public class VideoDetailFragment
         return sortedVideoStreams != null ? sortedVideoStreams.get(selectedVideoStreamIndex) : null;
     }
 
-    private void prepareDescription(final String descriptionHtml) {
-        if (TextUtils.isEmpty(descriptionHtml)) {
+    private void prepareDescription(final Description description) {
+        if (description == null || TextUtils.isEmpty(description.getContent())
+                || description == Description.emptyDescription) {
             return;
         }
 
-        disposables.add(Single.just(descriptionHtml)
-                .map((@io.reactivex.annotations.NonNull String description) -> {
-                    Spanned parsedDescription;
-                    if (Build.VERSION.SDK_INT >= 24) {
-                        parsedDescription = Html.fromHtml(description, 0);
-                    } else {
-                        //noinspection deprecation
-                        parsedDescription = Html.fromHtml(description);
-                    }
-                    return parsedDescription;
-                })
-                .subscribeOn(Schedulers.computation())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe((@io.reactivex.annotations.NonNull Spanned spanned) -> {
-                    videoDescriptionView.setText(spanned);
-                    videoDescriptionView.setVisibility(View.VISIBLE);
-                }));
-    }
-
-    private View getSeparatorView() {
-        View separator = new View(activity);
-        LinearLayout.LayoutParams params =
-                new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1);
-        int m8 = (int) TypedValue.applyDimension(
-                TypedValue.COMPLEX_UNIT_DIP, 8, getResources().getDisplayMetrics());
-        int m5 = (int) TypedValue.applyDimension(
-                TypedValue.COMPLEX_UNIT_DIP, 5, getResources().getDisplayMetrics());
-        params.setMargins(m8, m5, m8, m5);
-        separator.setLayoutParams(params);
-
-        TypedValue typedValue = new TypedValue();
-        activity.getTheme().resolveAttribute(R.attr.separator_color, typedValue, true);
-        separator.setBackgroundColor(typedValue.data);
-
-        return separator;
+        if (description.getType() == Description.HTML) {
+            disposables.add(Single.just(description.getContent())
+                    .map((@NonNull String descriptionText) -> {
+                        Spanned parsedDescription;
+                        if (Build.VERSION.SDK_INT >= 24) {
+                            parsedDescription = Html.fromHtml(descriptionText, 0);
+                        } else {
+                            //noinspection deprecation
+                            parsedDescription = Html.fromHtml(descriptionText);
+                        }
+                        return parsedDescription;
+                    })
+                    .subscribeOn(Schedulers.computation())
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .subscribe((@NonNull Spanned spanned) -> {
+                        videoDescriptionView.setText(spanned);
+                        videoDescriptionView.setVisibility(View.VISIBLE);
+                    }));
+        } else if (description.getType() == Description.MARKDOWN) {
+            final Markwon markwon = Markwon.builder(getContext())
+                    .usePlugin(LinkifyPlugin.create())
+                    .build();
+            markwon.setMarkdown(videoDescriptionView, description.getContent());
+            videoDescriptionView.setVisibility(View.VISIBLE);
+        } else {
+            //== Description.PLAIN_TEXT
+            videoDescriptionView.setAutoLinkMask(Linkify.WEB_URLS);
+            videoDescriptionView.setText(description.getContent(), TextView.BufferType.SPANNABLE);
+            videoDescriptionView.setVisibility(View.VISIBLE);
+        }
     }
 
     private void setHeightThumbnail() {
@@ -1023,71 +1062,34 @@ public class VideoDetailFragment
         thumbnailImageView.setMinimumHeight(height);
     }
 
-    private void showContentWithAnimation(long duration,
-                                          long delay,
-                                          @FloatRange(from = 0.0f, to = 1.0f) float translationPercent) {
-        int translationY = (int) (getResources().getDisplayMetrics().heightPixels *
-                (translationPercent > 0.0f ? translationPercent : .06f));
-
-        contentRootLayoutHiding.animate().setListener(null).cancel();
-        contentRootLayoutHiding.setAlpha(0f);
-        contentRootLayoutHiding.setTranslationY(translationY);
+    private void showContent() {
         contentRootLayoutHiding.setVisibility(View.VISIBLE);
-        contentRootLayoutHiding.animate()
-                .alpha(1f)
-                .translationY(0)
-                .setStartDelay(delay)
-                .setDuration(duration)
-                .setInterpolator(new FastOutSlowInInterpolator())
-                .start();
-
-        uploaderRootLayout.animate().setListener(null).cancel();
-        uploaderRootLayout.setAlpha(0f);
-        uploaderRootLayout.setTranslationY(translationY);
-        uploaderRootLayout.setVisibility(View.VISIBLE);
-        uploaderRootLayout.animate()
-                .alpha(1f)
-                .translationY(0)
-                .setStartDelay((long) (duration * .5f) + delay)
-                .setDuration(duration)
-                .setInterpolator(new FastOutSlowInInterpolator())
-                .start();
-
-        if (showRelatedStreams) {
-            relatedStreamRootLayout.animate().setListener(null).cancel();
-            relatedStreamRootLayout.setAlpha(0f);
-            relatedStreamRootLayout.setTranslationY(translationY);
-            relatedStreamRootLayout.setVisibility(View.VISIBLE);
-            relatedStreamRootLayout.animate()
-                    .alpha(1f)
-                    .translationY(0)
-                    .setStartDelay((long) (duration * .8f) + delay)
-                    .setDuration(duration)
-                    .setInterpolator(new FastOutSlowInInterpolator())
-                    .start();
-        }
     }
 
-    protected void setInitialData(int serviceId, String url, String name) {
-        this.serviceId = serviceId;
-        this.url = url;
-        this.name = !TextUtils.isEmpty(name) ? name : "";
+    protected void setInitialData(final int sid, final String u, final String title) {
+        this.serviceId = sid;
+        this.url = u;
+        this.name = !TextUtils.isEmpty(title) ? title : "";
     }
 
     private void setErrorImage(final int imageResource) {
-        if (thumbnailImageView == null || activity == null) return;
+        if (thumbnailImageView == null || activity == null) {
+            return;
+        }
 
-        thumbnailImageView.setImageDrawable(ContextCompat.getDrawable(activity, imageResource));
+        thumbnailImageView.setImageDrawable(
+                AppCompatResources.getDrawable(requireContext(), imageResource));
         animateView(thumbnailImageView, false, 0, 0,
                 () -> animateView(thumbnailImageView, true, 500));
     }
 
     @Override
-    public void showError(String message, boolean showRetryButton) {
+    public void showError(final String message, final boolean showRetryButton) {
         showError(message, showRetryButton, R.drawable.not_available_monkey);
     }
 
-    protected void showError(String message, boolean showRetryButton, @DrawableRes int imageError) {
+    protected void showError(final String message, final boolean showRetryButton,
+                             @DrawableRes final int imageError) {
         super.showError(message, showRetryButton);
         setErrorImage(imageError);
     }
@@ -1098,57 +1100,90 @@ public class VideoDetailFragment
 
     @Override
     public void showLoading() {
+
         super.showLoading();
 
-        animateView(contentRootLayoutHiding, false, 200);
+        //if data is already cached, transition from VISIBLE -> INVISIBLE -> VISIBLE is not required
+        if (!ExtractorHelper.isCached(serviceId, url, InfoItem.InfoType.STREAM)) {
+            contentRootLayoutHiding.setVisibility(View.INVISIBLE);
+        }
+
         animateView(spinnerToolbar, false, 200);
         animateView(thumbnailPlayButton, false, 50);
         animateView(detailDurationView, false, 100);
+        animateView(detailPositionView, false, 100);
+        animateView(positionView, false, 50);
 
         videoTitleTextView.setText(name != null ? name : "");
         videoTitleTextView.setMaxLines(1);
         animateView(videoTitleTextView, true, 0);
 
         videoDescriptionRootLayout.setVisibility(View.GONE);
-        if (videoTitleToggleArrow != null) {    //phone
-            videoTitleToggleArrow.setImageResource(R.drawable.arrow_down);
-            videoTitleToggleArrow.setVisibility(View.GONE);
-        } else {    //tablet
-            final View related = (View) relatedStreamRootLayout.getParent();
-            //don`t need to hide it if related streams are disabled
-            if (related.getVisibility() == View.VISIBLE) {
-                related.setVisibility(View.INVISIBLE);
-            }
-        }
+        videoTitleToggleArrow.setVisibility(View.GONE);
         videoTitleRoot.setClickable(false);
 
-        imageLoader.cancelDisplayTask(thumbnailImageView);
-        imageLoader.cancelDisplayTask(uploaderThumb);
+        if (relatedStreamsLayout != null) {
+            if (showRelatedStreams) {
+                relatedStreamsLayout.setVisibility(View.INVISIBLE);
+            } else {
+                relatedStreamsLayout.setVisibility(View.GONE);
+            }
+        }
+
+        IMAGE_LOADER.cancelDisplayTask(thumbnailImageView);
+        IMAGE_LOADER.cancelDisplayTask(subChannelThumb);
         thumbnailImageView.setImageBitmap(null);
-        uploaderThumb.setImageBitmap(null);
+        subChannelThumb.setImageBitmap(null);
     }
 
     @Override
-    public void handleResult(@NonNull StreamInfo info) {
+    public void handleResult(@NonNull final StreamInfo info) {
         super.handleResult(info);
 
         setInitialData(info.getServiceId(), info.getOriginalUrl(), info.getName());
-        pushToStack(serviceId, url, name);
+
+        if (showRelatedStreams) {
+            if (null == relatedStreamsLayout) { //phone
+                pageAdapter.updateItem(RELATED_TAB_TAG,
+                        RelatedVideosFragment.getInstance(currentInfo));
+                pageAdapter.notifyDataSetUpdate();
+            } else { //tablet
+                getChildFragmentManager().beginTransaction()
+                        .replace(R.id.relatedStreamsLayout,
+                                RelatedVideosFragment.getInstance(currentInfo))
+                        .commitNow();
+                relatedStreamsLayout.setVisibility(View.VISIBLE);
+            }
+        }
+
+        //pushToStack(serviceId, url, name);
 
         animateView(thumbnailPlayButton, true, 200);
         videoTitleTextView.setText(name);
 
-        if (!TextUtils.isEmpty(info.getUploaderName())) {
-            uploaderTextView.setText(info.getUploaderName());
-            uploaderTextView.setVisibility(View.VISIBLE);
-            uploaderTextView.setSelected(true);
+        if (!TextUtils.isEmpty(info.getSubChannelName())) {
+            displayBothUploaderAndSubChannel(info);
+        } else if (!TextUtils.isEmpty(info.getUploaderName())) {
+            displayUploaderAsSubChannel(info);
         } else {
             uploaderTextView.setVisibility(View.GONE);
+            uploaderThumb.setVisibility(View.GONE);
         }
-        uploaderThumb.setImageDrawable(ContextCompat.getDrawable(activity, R.drawable.buddy));
+
+        Drawable buddyDrawable = AppCompatResources.getDrawable(activity, R.drawable.buddy);
+        subChannelThumb.setImageDrawable(buddyDrawable);
+        uploaderThumb.setImageDrawable(buddyDrawable);
 
         if (info.getViewCount() >= 0) {
-            videoCountView.setText(Localization.localizeViewCount(activity, info.getViewCount()));
+            if (info.getStreamType().equals(StreamType.AUDIO_LIVE_STREAM)) {
+                videoCountView.setText(Localization.listeningCount(activity, info.getViewCount()));
+            } else if (info.getStreamType().equals(StreamType.LIVE_STREAM)) {
+                videoCountView.setText(Localization
+                        .localizeWatchingCount(activity, info.getViewCount()));
+            } else {
+                videoCountView.setText(Localization
+                        .localizeViewCount(activity, info.getViewCount()));
+            }
             videoCountView.setVisibility(View.VISIBLE);
         } else {
             videoCountView.setVisibility(View.GONE);
@@ -1163,7 +1198,8 @@ public class VideoDetailFragment
             thumbsDisabledTextView.setVisibility(View.VISIBLE);
         } else {
             if (info.getDislikeCount() >= 0) {
-                thumbsDownTextView.setText(Localization.shortCount(activity, info.getDislikeCount()));
+                thumbsDownTextView.setText(Localization
+                        .shortCount(activity, info.getDislikeCount()));
                 thumbsDownTextView.setVisibility(View.VISIBLE);
                 thumbsDownImageView.setVisibility(View.VISIBLE);
             } else {
@@ -1184,38 +1220,40 @@ public class VideoDetailFragment
 
         if (info.getDuration() > 0) {
             detailDurationView.setText(Localization.getDurationString(info.getDuration()));
-            detailDurationView.setBackgroundColor(ContextCompat.getColor(activity, R.color.duration_background_color));
+            detailDurationView.setBackgroundColor(
+                    ContextCompat.getColor(activity, R.color.duration_background_color));
             animateView(detailDurationView, true, 100);
         } else if (info.getStreamType() == StreamType.LIVE_STREAM) {
             detailDurationView.setText(R.string.duration_live);
-            detailDurationView.setBackgroundColor(ContextCompat.getColor(activity, R.color.live_duration_background_color));
+            detailDurationView.setBackgroundColor(
+                    ContextCompat.getColor(activity, R.color.live_duration_background_color));
             animateView(detailDurationView, true, 100);
         } else {
             detailDurationView.setVisibility(View.GONE);
         }
 
         videoDescriptionView.setVisibility(View.GONE);
-        if (videoTitleToggleArrow != null) {
-            videoTitleRoot.setClickable(true);
-            videoTitleToggleArrow.setVisibility(View.VISIBLE);
-            videoTitleToggleArrow.setImageResource(R.drawable.arrow_down);
-            videoDescriptionRootLayout.setVisibility(View.GONE);
+        videoTitleRoot.setClickable(true);
+        videoTitleToggleArrow.setImageResource(
+                ThemeHelper.resolveResourceIdFromAttr(requireContext(), R.attr.ic_expand_more));
+        videoTitleToggleArrow.setVisibility(View.VISIBLE);
+        videoDescriptionRootLayout.setVisibility(View.GONE);
+
+        if (info.getUploadDate() != null) {
+            videoUploadDateView.setText(Localization
+                    .localizeUploadDate(activity, info.getUploadDate().date().getTime()));
+            videoUploadDateView.setVisibility(View.VISIBLE);
         } else {
-            videoDescriptionRootLayout.setVisibility(View.VISIBLE);
+            videoUploadDateView.setText(null);
+            videoUploadDateView.setVisibility(View.GONE);
         }
-        if (!TextUtils.isEmpty(info.getUploadDate())) {
-            videoUploadDateView.setText(Localization.localizeDate(activity, info.getUploadDate()));
-        }
+
         prepareDescription(info.getDescription());
+        updateProgressInfo(info);
 
         animateView(spinnerToolbar, true, 500);
         setupActionBar(info);
         initThumbnailViews(info);
-        initRelatedVideos(info);
-        if (wasRelatedStreamsExpanded) {
-            toggleExpandRelatedVideos(currentInfo);
-            wasRelatedStreamsExpanded = false;
-        }
 
         setTitleToUrl(info.getServiceId(), info.getUrl(), info.getName());
         setTitleToUrl(info.getServiceId(), info.getOriginalUrl(), info.getName());
@@ -1235,13 +1273,16 @@ public class VideoDetailFragment
                 spinnerToolbar.setVisibility(View.GONE);
                 break;
             default:
-                if(info.getAudioStreams().isEmpty()) detailControlsBackground.setVisibility(View.GONE);
-                if (!info.getVideoStreams().isEmpty()
-                        || !info.getVideoOnlyStreams().isEmpty()) break;
+                if (info.getAudioStreams().isEmpty()) {
+                    detailControlsBackground.setVisibility(View.GONE);
+                }
+                if (!info.getVideoStreams().isEmpty() || !info.getVideoOnlyStreams().isEmpty()) {
+                    break;
+                }
 
                 detailControlsPopup.setVisibility(View.GONE);
                 spinnerToolbar.setVisibility(View.GONE);
-                thumbnailPlayButton.setImageResource(R.drawable.ic_headset_white_24dp);
+                thumbnailPlayButton.setImageResource(R.drawable.ic_headset_shadow);
                 break;
         }
 
@@ -1250,28 +1291,67 @@ public class VideoDetailFragment
             // Only auto play in the first open
             autoPlayEnabled = false;
         }
+    }
 
-        final ViewParent related = relatedStreamRootLayout.getParent();
-        if (related instanceof ScrollView) {
-            ((ScrollView) related).scrollTo(0, 0);
+    private void hideAgeRestrictedContent() {
+        showError(getString(R.string.restricted_video), false);
+
+        if (relatedStreamsLayout != null) { // tablet
+            relatedStreamsLayout.setVisibility(View.INVISIBLE);
+        }
+
+        viewPager.setVisibility(View.GONE);
+        tabLayout.setVisibility(View.GONE);
+    }
+
+    private void displayUploaderAsSubChannel(final StreamInfo info) {
+        subChannelTextView.setText(info.getUploaderName());
+        subChannelTextView.setVisibility(View.VISIBLE);
+        subChannelTextView.setSelected(true);
+        uploaderTextView.setVisibility(View.GONE);
+    }
+
+    private void displayBothUploaderAndSubChannel(final StreamInfo info) {
+        subChannelTextView.setText(info.getSubChannelName());
+        subChannelTextView.setVisibility(View.VISIBLE);
+        subChannelTextView.setSelected(true);
+
+        subChannelThumb.setVisibility(View.VISIBLE);
+
+        if (!TextUtils.isEmpty(info.getUploaderName())) {
+            uploaderTextView.setText(
+                    String.format(getString(R.string.video_detail_by), info.getUploaderName()));
+            uploaderTextView.setVisibility(View.VISIBLE);
+            uploaderTextView.setSelected(true);
+        } else {
+            uploaderTextView.setVisibility(View.GONE);
         }
     }
 
 
     public void openDownloadDialog() {
-            try {
-                DownloadDialog downloadDialog = DownloadDialog.newInstance(currentInfo);
-                downloadDialog.setVideoStreams(sortedVideoStreams);
-                downloadDialog.setAudioStreams(currentInfo.getAudioStreams());
-                downloadDialog.setSelectedVideoStream(selectedVideoStreamIndex);
+        try {
+            DownloadDialog downloadDialog = DownloadDialog.newInstance(currentInfo);
+            downloadDialog.setVideoStreams(sortedVideoStreams);
+            downloadDialog.setAudioStreams(currentInfo.getAudioStreams());
+            downloadDialog.setSelectedVideoStream(selectedVideoStreamIndex);
+            downloadDialog.setSubtitleStreams(currentInfo.getSubtitles());
 
-                downloadDialog.show(activity.getSupportFragmentManager(), "downloadDialog");
-            } catch (Exception e) {
-                Toast.makeText(activity,
-                        R.string.could_not_setup_download_menu,
-                        Toast.LENGTH_LONG).show();
-                e.printStackTrace();
-            }
+            downloadDialog.show(getActivity().getSupportFragmentManager(), "downloadDialog");
+        } catch (Exception e) {
+            ErrorActivity.ErrorInfo info = ErrorActivity.ErrorInfo.make(UserAction.UI_ERROR,
+                    ServiceList.all()
+                            .get(currentInfo
+                                    .getServiceId())
+                            .getServiceInfo()
+                            .getName(), "",
+                    R.string.could_not_setup_download_menu);
+
+            ErrorActivity.reportError(getActivity(),
+                    e,
+                    getActivity().getClass(),
+                    getActivity().findViewById(android.R.id.content), info);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////////////////
@@ -1279,46 +1359,67 @@ public class VideoDetailFragment
     //////////////////////////////////////////////////////////////////////////*/
 
     @Override
-    protected boolean onError(Throwable exception) {
-        if (super.onError(exception)) return true;
-
-        if (exception instanceof YoutubeStreamExtractor.GemaException) {
-            onBlockedByGemaError();
-        } else if (exception instanceof ContentNotAvailableException) {
-            showError(getString(R.string.content_not_available), false);
-        } else {
-            int errorId = exception instanceof YoutubeStreamExtractor.DecryptException
-                    ? R.string.youtube_signature_decryption_error
-                    : exception instanceof ParsingException
-                    ? R.string.parsing_error
-                    : R.string.general_error;
-            onUnrecoverableError(exception,
-                    UserAction.REQUESTED_STREAM,
-                    NewPipe.getNameOfService(serviceId),
-                    url,
-                    errorId);
+    protected boolean onError(final Throwable exception) {
+        if (super.onError(exception)) {
+            return true;
         }
+
+        //Isayso
+        int errorId = exception instanceof YoutubeStreamExtractor.DeobfuscateException
+                ? R.string.youtube_signature_decryption_error
+                : exception instanceof ExtractionException
+                        ? R.string.parsing_error
+                        : R.string.general_error;
+
+        onUnrecoverableError(exception, UserAction.REQUESTED_STREAM,
+                NewPipe.getNameOfService(serviceId), url, errorId);
 
         return true;
     }
 
-    public void onBlockedByGemaError() {
-        thumbnailBackgroundButton.setOnClickListener((View v) -> {
-            Intent intent = new Intent();
-            intent.setAction(Intent.ACTION_VIEW);
-            intent.setData(Uri.parse(getString(R.string.c3s_url)));
-            startActivity(intent);
-        });
-
-        showError(getString(R.string.blocked_by_gema), false, R.drawable.gruese_die_gema);
-    }
-
-    private void setRelatedStreamsVisibility(int visibility) {
-        final ViewParent parent = relatedStreamRootLayout.getParent();
-        if (parent instanceof ScrollView) {
-            ((ScrollView) parent).setVisibility(visibility);
-        } else {
-            relatedStreamRootLayout.setVisibility(visibility);
+    private void updateProgressInfo(@NonNull final StreamInfo info) {
+        if (positionSubscriber != null) {
+            positionSubscriber.dispose();
         }
+        final SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(activity);
+        final boolean playbackResumeEnabled = prefs
+                .getBoolean(activity.getString(R.string.enable_watch_history_key), true)
+                && prefs.getBoolean(activity.getString(R.string.enable_playback_resume_key), true);
+
+        if (!playbackResumeEnabled || info.getDuration() <= 0) {
+            positionView.setVisibility(View.INVISIBLE);
+            detailPositionView.setVisibility(View.GONE);
+
+            // TODO: Remove this check when separation of concerns is done.
+            //  (live streams weren't getting updated because they are mixed)
+            if (!info.getStreamType().equals(StreamType.LIVE_STREAM)
+                    && !info.getStreamType().equals(StreamType.AUDIO_LIVE_STREAM)) {
+                return;
+            }
+        }
+        final HistoryRecordManager recordManager = new HistoryRecordManager(requireContext());
+
+        // TODO: Separate concerns when updating database data.
+        //  (move the updating part to when the loading happens)
+        positionSubscriber = recordManager.loadStreamState(info)
+                .subscribeOn(Schedulers.io())
+                .onErrorComplete()
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(state -> {
+                    final int seconds
+                            = (int) TimeUnit.MILLISECONDS.toSeconds(state.getProgressTime());
+                    positionView.setMax((int) info.getDuration());
+                    positionView.setProgressAnimated(seconds);
+                    detailPositionView.setText(Localization.getDurationString(seconds));
+                    animateView(positionView, true, 500);
+                    animateView(detailPositionView, true, 500);
+                }, e -> {
+                    if (DEBUG) {
+                        e.printStackTrace();
+                    }
+                }, () -> {
+                    animateView(positionView, false, 500);
+                    animateView(detailPositionView, false, 500);
+                });
     }
 }

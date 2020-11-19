@@ -2,152 +2,167 @@ package us.shandian.giga.get;
 
 import android.util.Log;
 
-import java.io.RandomAccessFile;
+import org.schabi.newpipe.streams.io.SharpStream;
+
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.HttpURLConnection;
-import java.net.URL;
+import java.nio.channels.ClosedByInterruptException;
+
+import us.shandian.giga.get.DownloadMission.Block;
+import us.shandian.giga.get.DownloadMission.HttpError;
 
 import static org.schabi.newpipe.BuildConfig.DEBUG;
+import static us.shandian.giga.get.DownloadMission.ERROR_HTTP_FORBIDDEN;
+
 
 /**
  * Runnable to download blocks of a file until the file is completely downloaded,
  * an error occurs or the process is stopped.
  */
-public class DownloadRunnable implements Runnable {
-    private static final String TAG = DownloadRunnable.class.getSimpleName();
+public class DownloadRunnable extends Thread {
+    private static final String TAG = "DownloadRunnable";
 
     private final DownloadMission mMission;
     private final int mId;
 
-    public DownloadRunnable(DownloadMission mission, int id) {
+    private HttpURLConnection mConn;
+
+    DownloadRunnable(DownloadMission mission, int id) {
         if (mission == null) throw new NullPointerException("mission is null");
         mMission = mission;
         mId = id;
     }
 
+    private void releaseBlock(Block block, long remain) {
+        // set the block offset to -1 if it is completed
+        mMission.releaseBlock(block.position, remain < 0 ? -1 : block.done);
+    }
+
     @Override
     public void run() {
-        boolean retry = mMission.recovered;
-        long position = mMission.getPosition(mId);
+        boolean retry = false;
+        Block block = null;
+        int retryCount = 0;
+        SharpStream f;
 
-        if (DEBUG) {
-            Log.d(TAG, mId + ":default pos " + position);
-            Log.d(TAG, mId + ":recovered: " + mMission.recovered);
+        try {
+            f = mMission.storage.getStream();
+        } catch (IOException e) {
+            mMission.notifyError(e);// this never should happen
+            return;
         }
 
-        while (mMission.errCode == -1 && mMission.running && position < mMission.blocks) {
-
-            if (Thread.currentThread().isInterrupted()) {
-                mMission.pause();
-                return;
+        while (mMission.running && mMission.errCode == DownloadMission.ERROR_NOTHING) {
+            if (!retry) {
+                block = mMission.acquireBlock();
             }
 
-            if (DEBUG && retry) {
-                Log.d(TAG, mId + ":retry is true. Resuming at " + position);
-            }
-
-            // Wait for an unblocked position
-            while (!retry && position < mMission.blocks && mMission.isBlockPreserved(position)) {
-
-                if (DEBUG) {
-                    Log.d(TAG, mId + ":position " + position + " preserved, passing");
-                }
-
-                position++;
-            }
-
-            retry = false;
-
-            if (position >= mMission.blocks) {
+            if (block == null) {
+                if (DEBUG) Log.d(TAG, mId + ":no more blocks left, exiting");
                 break;
             }
 
             if (DEBUG) {
-                Log.d(TAG, mId + ":preserving position " + position);
+                if (retry)
+                    Log.d(TAG, mId + ":retry block at position=" + block.position + " from the start");
+                else
+                    Log.d(TAG, mId + ":acquired block at position=" + block.position + " done=" + block.done);
             }
 
-            mMission.preserveBlock(position);
-            mMission.setPosition(mId, position);
+            long start = (long)block.position * DownloadMission.BLOCK_SIZE;
+            long end = start + DownloadMission.BLOCK_SIZE - 1;
 
-            long start = position * DownloadManager.BLOCK_SIZE;
-            long end = start + DownloadManager.BLOCK_SIZE - 1;
+            start += block.done;
 
             if (end >= mMission.length) {
                 end = mMission.length - 1;
             }
 
-            HttpURLConnection conn = null;
-
-            int total = 0;
-
             try {
-                URL url = new URL(mMission.url);
-                conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestProperty("Range", "bytes=" + start + "-" + end);
+                mConn = mMission.openConnection(false, start, end);
+                mMission.establishConnection(mId, mConn);
 
-                if (DEBUG) {
-                    Log.d(TAG, mId + ":" + conn.getRequestProperty("Range"));
-                    Log.d(TAG, mId + ":Content-Length=" + conn.getContentLength() + " Code:" + conn.getResponseCode());
-                }
-
-                // A server may be ignoring the range request
-                if (conn.getResponseCode() != 206) {
-                    mMission.errCode = DownloadMission.ERROR_SERVER_UNSUPPORTED;
-                    notifyError();
-
-                    if (DEBUG) {
-                        Log.e(TAG, mId + ":Unsupported " + conn.getResponseCode());
+                // check if the download can be resumed
+                if (mConn.getResponseCode() == 416) {
+                    if (block.done > 0) {
+                        // try again from the start (of the block)
+                        mMission.notifyProgress(-block.done);
+                        block.done = 0;
+                        retry = true;
+                        mConn.disconnect();
+                        continue;
                     }
 
+                    throw new DownloadMission.HttpError(416);
+                }
+
+                retry = false;
+
+                // The server may be ignoring the range request
+                if (mConn.getResponseCode() != 206) {
+                    if (DEBUG) {
+                        Log.e(TAG, mId + ":Unsupported " + mConn.getResponseCode());
+                    }
+                    mMission.notifyError(new DownloadMission.HttpError(mConn.getResponseCode()));
                     break;
                 }
 
-                RandomAccessFile f = new RandomAccessFile(mMission.location + "/" + mMission.name, "rw");
-                f.seek(start);
-                java.io.InputStream ipt = conn.getInputStream();
-                byte[] buf = new byte[64*1024];
+                f.seek(mMission.offsets[mMission.current] + start);
 
-                while (start < end && mMission.running) {
-                    int len = ipt.read(buf, 0, buf.length);
+                try (InputStream is = mConn.getInputStream()) {
+                    byte[] buf = new byte[DownloadMission.BUFFER_SIZE];
+                    int len;
 
-                    if (len == -1) {
-                        break;
-                    } else {
-                        start += len;
-                        total += len;
+                    // use always start <= end
+                    // fixes a deadlock because in some videos, youtube is sending one byte alone
+                    while (start <= end && mMission.running && (len = is.read(buf, 0, buf.length)) != -1) {
                         f.write(buf, 0, len);
-                        notifyProgress(len);
+                        start += len;
+                        block.done += len;
+                        mMission.notifyProgress(len);
                     }
                 }
 
                 if (DEBUG && mMission.running) {
-                    Log.d(TAG, mId + ":position " + position + " finished, total length " + total);
+                    Log.d(TAG, mId + ":position " + block.position + " stopped " + start + "/" + end);
                 }
-
-                f.close();
-                ipt.close();
-
-                // TODO We should save progress for each thread
             } catch (Exception e) {
-                // TODO Retry count limit & notify error
-                retry = true;
+                if (!mMission.running || e instanceof ClosedByInterruptException) break;
 
-                notifyProgress(-total);
+                if (e instanceof HttpError && ((HttpError) e).statusCode == ERROR_HTTP_FORBIDDEN) {
+                    // for youtube streams. The url has expired, recover
+                    f.close();
 
-                if (DEBUG) {
-                    Log.d(TAG, mId + ":position " + position + " retrying", e);
+                    if (mId == 1) {
+                        // only the first thread will execute the recovery procedure
+                        mMission.doRecover(ERROR_HTTP_FORBIDDEN);
+                    }
+                    return;
                 }
+
+                if (retryCount++ >= mMission.maxRetry) {
+                    mMission.notifyError(e);
+                    break;
+                }
+
+                retry = true;
+            } finally {
+                if (!retry) releaseBlock(block, end - start);
             }
         }
 
+        f.close();
+
         if (DEBUG) {
-            Log.d(TAG, "thread " + mId + " exited main loop");
+            Log.d(TAG, "thread " + mId + " exited from main download loop");
         }
 
-        if (mMission.errCode == -1 && mMission.running) {
+        if (mMission.errCode == DownloadMission.ERROR_NOTHING && mMission.running) {
             if (DEBUG) {
                 Log.d(TAG, "no error has happened, notifying");
             }
-            notifyFinished();
+            mMission.notifyFinished();
         }
 
         if (DEBUG && !mMission.running) {
@@ -155,22 +170,15 @@ public class DownloadRunnable implements Runnable {
         }
     }
 
-    private void notifyProgress(final long len) {
-        synchronized (mMission) {
-            mMission.notifyProgress(len);
+    @Override
+    public void interrupt() {
+        super.interrupt();
+
+        try {
+            if (mConn != null) mConn.disconnect();
+        } catch (Exception e) {
+            // nothing to do
         }
     }
 
-    private void notifyError() {
-        synchronized (mMission) {
-            mMission.notifyError(DownloadMission.ERROR_SERVER_UNSUPPORTED);
-            mMission.pause();
-        }
-    }
-
-    private void notifyFinished() {
-        synchronized (mMission) {
-            mMission.notifyFinished();
-        }
-    }
 }
