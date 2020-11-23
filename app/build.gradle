@@ -8,14 +8,15 @@ android {
     compileSdkVersion 30
     buildToolsVersion '29.0.3'
 
+
     defaultConfig {
         applicationId "org.schabi.newpipe"
         resValue "string", "app_name", "NewPipe"
         minSdkVersion 19
         targetSdkVersion 30
         versionCode 957
-        versionName "19.9 Isayso Fork 11/19/20"
-
+        versionName "19.9 Isayso Fork 11/22/20"
+        multiDexEnabled true  //Isayso
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
 
@@ -63,6 +64,8 @@ android {
     }
 
     compileOptions {
+        // Flag to enable support for the new language APIs
+        coreLibraryDesugaringEnabled true
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
         encoding 'utf-8'
@@ -150,6 +153,8 @@ afterEvaluate {
 }
 
 dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:1.1.1'
+
     //Isayso false warning:
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.4.10"
 
@@ -175,8 +180,11 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0', {
         exclude module: 'support-annotations'
     }
+    //Version 958
+    implementation 'com.github.TeamNewPipe:NewPipeExtractor:650f0920fea535e08728d895d7b21f19c740817c'
+
     //Version code 957
-    implementation 'com.github.TeamNewPipe:NewPipeExtractor:6701b0fe718f6bdc385221341fa473e8aaab560e'
+   // implementation 'com.github.TeamNewPipe:NewPipeExtractor:6701b0fe718f6bdc385221341fa473e8aaab560e'
 
 //Version code 956
 //    implementation 'com.github.TeamNewPipe:NewPipeExtractor:19c0e8700db3af35e5dfc58e4eea50e75d7c4c61'
