@@ -20,59 +20,11 @@
 
 <b>PUTTING NEWPIPE OR ANY FORK OF IT INTO GOOGLE PLAYSTORE VIOLATES THEIR TERMS OF CONDITIONS.</b>
 
-## Screenshots
-
-[<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/shot_01.png" width=160>](fastlane/metadata/android/en-US/images/phoneScreenshots/shot_01.png)
-[<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/shot_02.png" width=160>](fastlane/metadata/android/en-US/images/phoneScreenshots/shot_02.png)
-[<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/shot_03.png" width=160>](fastlane/metadata/android/en-US/images/phoneScreenshots/shot_03.png)
-[<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/shot_04.png" width=160>](fastlane/metadata/android/en-US/images/phoneScreenshots/shot_04.png)
-[<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/shot_05.png" width=160>](fastlane/metadata/android/en-US/images/phoneScreenshots/shot_05.png)
-[<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/shot_06.png" width=160>](fastlane/metadata/android/en-US/images/phoneScreenshots/shot_06.png)
-[<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/shot_07.png" width=160>](fastlane/metadata/android/en-US/images/phoneScreenshots/shot_07.png)
-[<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/shot_08.png" width=160>](fastlane/metadata/android/en-US/images/phoneScreenshots/shot_08.png)
-[<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/shot_09.png" width=160>](fastlane/metadata/android/en-US/images/phoneScreenshots/shot_09.png)
-[<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/shot_10.png" width=160>](fastlane/metadata/android/en-US/images/phoneScreenshots/shot_10.png)
-[<img src="fastlane/metadata/android/en-US/images/tenInchScreenshots/shot_11.png" width=405>](fastlane/metadata/android/en-US/images/tenInchScreenshots/shot_11.png)
-[<img src="fastlane/metadata/android/en-US/images/tenInchScreenshots/shot_12.png" width=405>](fastlane/metadata/android/en-US/images/tenInchScreenshots/shot_12.png)
 
 ## Description
 
 NewPipe does not use any Google framework libraries, nor the YouTube API. Websites are only parsed to fetch required info, so this app can be used on devices without Google services installed. Also, you don't need a YouTube account to use NewPipe, which is copylefted libre software.
 
-### Features
-
-* Search videos
-* Display general info about videos
-* Watch YouTube videos
-* Listen to YouTube videos
-* Popup mode (floating player)
-* Select streaming player to watch video with
-* Download videos
-* Download audio only
-* Open a video in Kodi
-* Show next/related videos
-* Search YouTube in a specific language
-* Watch/Block age restricted material
-* Display general info about channels
-* Search channels
-* Watch videos from a channel
-* Orbot/Tor support (not yet directly)
-* 1080p/2K/4K support
-* View history
-* Subscribe to channels
-* Search history
-* Search/watch playlists
-* Watch as enqueued playlists
-* Enqueue videos
-* Local playlists
-* Subtitles
-* Livestream support
-* Show comments
-
-### Coming Features
-
-* Cast to UPnP and Cast
-* … and many more
 
 ### Supported Services
 
@@ -103,26 +55,6 @@ The more is done the better it gets!
 
 If you'd like to get involved, check our [contribution notes](.github/CONTRIBUTING.md).
 
-## Donate
-If you like NewPipe we'd be happy about a donation. You can either send bitcoin or donate via Bountysource or Liberapay. For further info on donating to NewPipe, please visit our [website](https://newpipe.schabi.org/donate).
-
-<table>
-  <tr>
-    <td><img src="https://bitcoin.org/img/icons/logotop.svg" alt="Bitcoin"></td>
-    <td><img src="assets/bitcoin_qr_code.png" alt="Bitcoin QR code" width="100px"></td>
-    <td><samp>16A9J59ahMRqkLSZjhYj33n9j3fMztFxnh</samp></td>
-  </tr>
-  <tr>
-    <td><a href="https://liberapay.com/TeamNewPipe/"><img src="https://upload.wikimedia.org/wikipedia/commons/2/27/Liberapay_logo_v2_white-on-yellow.svg" alt="Liberapay" width="80px" ></a></td>
-    <td><a href="https://liberapay.com/TeamNewPipe/"><img src="assets/liberapay_qr_code.png" alt="Visit NewPipe at liberapay.com" width="100px"></a></td>
-    <td><a href="https://liberapay.com/TeamNewPipe/donate"><img src="assets/liberapay_donate_button.svg" alt="Donate via Liberapay" height="35px"></a></td>
-  </tr>
-  <tr>
-    <td><a href="https://www.bountysource.com/teams/newpipe"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/Bountysource.png/320px-Bountysource.png" alt="Bountysource" width="190px"></a></td>
-    <td><a href="https://www.bountysource.com/teams/newpipe"><img src="assets/bountysource_qr_code.png" alt="Visit NewPipe at bountysource.com" width="100px"></a></td>
-    <td><a href="https://www.bountysource.com/teams/newpipe/issues"><img src="https://img.shields.io/bountysource/team/newpipe/activity.svg?colorB=cd201f" height="30px" alt="Check out how many bounties you can earn."></a></td>
-  </tr>
-</table>
 
 ## Privacy Policy
 
@@ -137,3 +69,6 @@ will. Specifically you can redistribute and/or modify it under the terms of the
 [GNU General Public License](https://www.gnu.org/licenses/gpl.html) as
 published by the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.  
+
+![GitHub Releases (by Release)](https://img.shields.io/github/downloads/Isayso/NewPipe19/total)
+
