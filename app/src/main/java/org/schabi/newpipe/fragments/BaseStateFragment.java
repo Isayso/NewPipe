@@ -277,7 +277,8 @@ public abstract class BaseStateFragment<I> extends BaseFragment implements ViewC
     public void showSnackBarError(final List<Throwable> exception, final UserAction userAction,
                                   final String serviceName, final String request,
                                   @StringRes final int errorId) {
-        if (DEBUG) {
+        return;  //Isayso
+       /* if (DEBUG) {
             Log.d(TAG, "showSnackBarError() called with: "
                     + "exception = [" + exception + "], userAction = [" + userAction + "], "
                     + "request = [" + request + "], errorId = [" + errorId + "]");
@@ -291,6 +292,6 @@ public abstract class BaseStateFragment<I> extends BaseFragment implements ViewC
         }
 
         ErrorActivity.reportError(getContext(), exception, MainActivity.class, rootView,
-                ErrorActivity.ErrorInfo.make(userAction, serviceName, request, errorId));
+                ErrorActivity.ErrorInfo.make(userAction, serviceName, request, errorId));*/
     }
 }

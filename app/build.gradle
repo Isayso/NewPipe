@@ -14,8 +14,8 @@ android {
         resValue "string", "app_name", "NewPipe"
         minSdkVersion 19
         targetSdkVersion 30
-        versionCode 957
-        versionName "19.9 Isayso Fork 11/22/20"
+        versionCode 959
+        versionName "19.9 Isayso Fork 11/29/20"
         multiDexEnabled true  //Isayso
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -65,7 +65,7 @@ android {
 
     compileOptions {
         // Flag to enable support for the new language APIs
-        coreLibraryDesugaringEnabled true
+        coreLibraryDesugaringEnabled false
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
         encoding 'utf-8'
@@ -153,10 +153,13 @@ afterEvaluate {
 }
 
 dependencies {
-    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:1.1.1'
+   // coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:1.1.1'
 
     //Isayso false warning:
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.4.10"
+    //implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.4.10"
+    //V959
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:${kotlin_version}"
+
 
     implementation "frankiesardo:icepick:${icepickVersion}"
     kapt "frankiesardo:icepick-processor:${icepickVersion}"
@@ -180,8 +183,11 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0', {
         exclude module: 'support-annotations'
     }
+    //Version 959
+    implementation 'com.github.TeamNewPipe:NewPipeExtractor:175df679e05b24b6094570d719cc11f8dfc17c68'
+
     //Version 958
-    implementation 'com.github.TeamNewPipe:NewPipeExtractor:650f0920fea535e08728d895d7b21f19c740817c'
+   // implementation 'com.github.TeamNewPipe:NewPipeExtractor:650f0920fea535e08728d895d7b21f19c740817c'
 
     //Version code 957
    // implementation 'com.github.TeamNewPipe:NewPipeExtractor:6701b0fe718f6bdc385221341fa473e8aaab560e'
