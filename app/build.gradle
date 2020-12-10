@@ -14,8 +14,8 @@ android {
         resValue "string", "app_name", "NewPipe"
         minSdkVersion 19
         targetSdkVersion 30
-        versionCode 959
-        versionName "19.9 Isayso Fork 11/29/20"
+        versionCode 960
+        versionName "19.9.6 Isayso Fork"
         multiDexEnabled true  //Isayso
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -183,8 +183,11 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0', {
         exclude module: 'support-annotations'
     }
+    //Version 960
+    implementation 'com.github.TeamNewPipe:NewPipeExtractor:b3835bd616ab28b861c83dcefd56e1754c6d20be'
+
     //Version 959
-    implementation 'com.github.TeamNewPipe:NewPipeExtractor:175df679e05b24b6094570d719cc11f8dfc17c68'
+  //  implementation 'com.github.TeamNewPipe:NewPipeExtractor:175df679e05b24b6094570d719cc11f8dfc17c68'
 
     //Version 958
    // implementation 'com.github.TeamNewPipe:NewPipeExtractor:650f0920fea535e08728d895d7b21f19c740817c'
